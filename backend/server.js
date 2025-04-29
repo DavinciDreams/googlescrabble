@@ -4,8 +4,6 @@ const { Server } = require("socket.io");
 // TODO: Import game logic/management functions later
 // const gameManager = require('./game/gameManager');
 
-const PORT = process.env.PORT || 3001; // Port for the backend server
-
 const app = express();
 const server = http.createServer(app);
 

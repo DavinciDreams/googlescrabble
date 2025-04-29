@@ -70,7 +70,11 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start the server
+// Near the top/middle where you define PORT:
+const PORT = process.env.PORT || 3001; // Use Render's port or 3001 locally
+
+// Near the bottom where you start the server:
 server.listen(PORT, () => {
+    // Log the ACTUAL port being used for confirmation
     console.log(`Server listening on *:${PORT}`);
 });

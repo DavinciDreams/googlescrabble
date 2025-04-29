@@ -53,3 +53,23 @@
     /* Optional: style the empty slot differently if its tile is on the board */
     background-color: rgba(255, 255, 0, 0.1); /* Faint yellow background */
 }
+
+/* In Rack.css */
+
+/* Style for the rack slot containing a selected tile */
+.rack-slot.slot-selected-exchange {
+    background-color: rgba(75, 181, 67, 0.3); /* Light green semi-transparent background */
+    border: 1px dashed #4CAF50; /* Green dashed border */
+    border-radius: 4px; /* Match tile maybe */
+}
+
+/* Add cursor pointer to indicate selectable tiles */
+.rack-slot.selectable {
+    cursor: pointer;
+}
+
+/* Optional: Slightly dim the tile itself when selected */
+/* .rack-slot.slot-selected-exchange .tile { */
+    /* opacity: 0.8; */
+    /* box-shadow: 0 0 5px 2px #4CAF50; */
+/* } */

@@ -1,41 +1,56 @@
 import React from 'react';
 import './Tile.css';
 
-// Added 'originData' prop to know where the tile came from (rack index, or board coords)
-const Tile = ({ letter, value, isDraggable = false, id, originData }) => {
+// Added 'isSelected' prop for visual feedback during exchange selection
+const Tile = ({
+    letter,
+    value,
+    isDraggable = false,
+    id,
+    originData, // { type: 'rack', index: number } or { type: 'board', row: number, col: number }
+    isSelected = false // For exchange highlight
+}) => {
     const isBlank = letter === 'BLANK';
-    // For display purposes, maybe show the assigned letter if it's a placed blank
-    // This logic might need refinement depending on how assigned blanks are stored
-    const displayLetter = isBlank && value > 0 ? ' ' : (isBlank ? '' : letter);
+    // Handle display for assigned blanks (if backend stores assigned letter, use that)
+    // For now, blanks just look empty until placed maybe
+    const displayLetter = isBlank ? '' : letter;
     const displayValue = isBlank ? '' : value;
 
     const handleDragStart = (e) => {
         if (isDraggable) {
-            console.log(`Dragging tile: ${letter} (id: ${id}, origin: ${JSON.stringify(originData)})`);
-            const tileData = JSON.stringify({ letter, value, id, originData }); // Include originData
+            // Make sure originData is attached
+            if (!originData) {
+                console.error("Tile drag started without originData!", { id, letter });
+                e.preventDefault(); // Prevent dragging improperly configured tile
+                return;
+            }
+            const tileData = JSON.stringify({ letter, value, id, originData });
             e.dataTransfer.setData("application/json", tileData);
             e.dataTransfer.effectAllowed = "move";
-            e.currentTarget.classList.add('dragging');
-            // Optional: slightly delay hiding the original if needed for visual feel
-            // setTimeout(() => { e.target.style.opacity = '0.5'; }, 0);
+            // Add slight delay to class adding for smoother visual transition
+            setTimeout(() => e.target?.classList.add('dragging'), 0);
         } else {
             e.preventDefault();
         }
     };
 
     const handleDragEnd = (e) => {
-         e.currentTarget.classList.remove('dragging');
-         // e.target.style.opacity = '1'; // Restore opacity if changed
+         // Use try/finally to ensure class is removed even if errors occur
+         try {
+             // Any cleanup needed after drag ends
+         } finally {
+            e.target?.classList.remove('dragging');
+         }
     };
 
     return (
         <div
-            className={`tile ${isBlank ? 'blank-tile' : ''}`}
+            className={`tile ${isBlank ? 'blank-tile' : ''} ${isSelected ? 'tile-selected-exchange' : ''}`} // Add selection class
             draggable={isDraggable}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             id={id}
-            title={isBlank ? "Blank Tile" : `${letter} - ${value} points`} // Tooltip
+            title={isBlank ? "Blank Tile" : `${letter} - ${value} points`}
         >
             <span className="tile-letter">{displayLetter}</span>
             {!isBlank && <span className="tile-value">{displayValue}</span>}

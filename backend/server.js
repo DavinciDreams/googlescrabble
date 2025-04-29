@@ -20,20 +20,47 @@ app.get('/', (req, res) => {
     res.send('Scrabble Server is running!');
 });
 
-// Handle Socket.IO connections
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+    console.log(`User connected: ${socket.id}`); // You are seeing this
 
-    // --- Placeholder Event Handlers ---
-    // TODO: Implement actual game joining, move making, etc.
-
+    // --- THIS IS THE BLOCK TO DEBUG ---
     socket.on('joinGame', (data) => {
-        // TODO: Logic to find or create a game, add player
+        // You are seeing this log:
         console.log(`Player ${socket.id} wants to join/create game with data:`, data);
-        // Example: socket.join(gameId);
-        // Example: io.to(gameId).emit('playerJoined', { playerId: socket.id, username: data.username });
-        // Example: socket.emit('gameJoined', initialGameState);
+
+        // --- WHAT HAPPENS NEXT? ---
+        // TODO: Logic to find or create a game, add player
+        // Are you actually calling functions to manage games? (e.g., gameManager)
+        // Does this logic work correctly? Add logs inside it.
+
+        // Example placeholder logic (REPLACE WITH YOUR ACTUAL LOGIC):
+        const tempGameId = 'game123'; // Placeholder
+        const playerAdded = true; // Placeholder
+        const initialGameState = { /* some placeholder state */ }; // Placeholder
+
+        if (playerAdded && tempGameId) {
+            console.log(`Attempting to add player ${socket.id} to room ${tempGameId}`); // <-- ADD LOG
+            socket.join(tempGameId); // Join the Socket.IO room for broadcast
+
+            console.log(`Attempting to emit 'gameJoined' to ${socket.id}`); // <-- ADD LOG
+            // ---> THIS EMIT IS CRITICAL <---
+            // Are you emitting the 'gameJoined' event correctly?
+            // Does 'getPlayerSpecificState' exist and return valid data?
+            // Replace placeholder 'initialGameState' with your actual game state object
+            socket.emit('gameJoined', initialGameState /* gameState.getPlayerSpecificState(socket.id) */);
+
+            console.log(`Attempting to emit 'playerJoined' to room ${tempGameId}`); // <-- ADD LOG
+            // Notify others in the room (optional but good)
+            // Replace placeholder data with actual player info
+            io.to(tempGameId).emit('playerJoined', { playerId: socket.id, username: data.username });
+
+        } else {
+            console.error(`Failed to add player ${socket.id} to a game.`); // <-- ADD LOG
+            // Emit an error back if joining/creation failed
+            socket.emit('gameError', { message: 'Failed to join or create game.' }); // <-- ARE YOU EMITTING ERRORS?
+        }
     });
+    // --- END OF BLOCK TO DEBUG ---
 
     socket.on('placeTiles', (data) => {
         // TODO: Validate move, update game state, broadcast update

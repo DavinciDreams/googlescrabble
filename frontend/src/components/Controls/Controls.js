@@ -1,37 +1,33 @@
 import React from 'react';
-import './Controls.css'; // Create this CSS file
+import './Controls.css';
 
-const Controls = ({ onPlay, onPass, onExchange, disabled = false }) => {
+// Directly use handlers passed as props
+const Controls = ({
+    onPlay,
+    onPass,
+    onExchange,
+    disabled = false,
+    // Add props related to exchange button state if needed
+    // exchangeDisabled = false // Example: disable if nothing selected
+}) => {
 
-    // These handlers would typically gather necessary data before calling props
-    const handlePlayClick = () => {
-        // TODO: Get the currently placed tiles from component state (managed higher up)
-        console.log("Play button clicked - need data on placed tiles.");
-        // onPlay(placedTilesData);
-        alert("Play logic needs implementation (handling temporary placements).");
-    };
-
-    const handleExchangeClick = () => {
-        // TODO: Get which tiles are selected for exchange from component state
-         console.log("Exchange button clicked - need data on selected tiles.");
-        // onExchange(selectedTiles);
-         alert("Exchange logic needs implementation (selecting tiles).");
-    };
-
+    // No internal handlers needed here anymore
+    // Logic is handled in App.js which passes the relevant functions (handlePlayMove, etc.)
 
     return (
         <div className="game-controls">
-            <button onClick={handlePlayClick} disabled={disabled}>
+            {/* Play button uses the main 'disabled' prop */}
+            <button onClick={onPlay} disabled={disabled}>
                 Play Word
             </button>
             <button onClick={onPass} disabled={disabled}>
                 Pass Turn
             </button>
-            <button onClick={handleExchangeClick} disabled={disabled}>
+            {/* Exchange button might need its own disabled logic based on selection */}
+            <button onClick={onExchange} disabled={disabled /* || exchangeDisabled */ }>
                 Exchange Tiles
             </button>
-             {/* Could add a Shuffle Rack button here too */}
-             {/* <button onClick={onShuffle} disabled={disabled}>Shuffle Rack</button> */}
+            {/* Optional: <button onClick={onShuffle} disabled={disabled}>Shuffle Rack</button> */}
         </div>
     );
 };

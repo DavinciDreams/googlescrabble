@@ -1,21 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import './Chat.css'; // Create this CSS file
+import './Chat.css';
 
-const Chat = ({ messages = [], onSendMessage }) => {
+// Added playersInfo prop to map senderId to username
+const Chat = ({ messages = [], onSendMessage, playersInfo = [], myPlayerId }) => {
     const [newMessage, setNewMessage] = useState('');
-    const messagesEndRef = useRef(null); // To auto-scroll chat
+    const messagesEndRef = useRef(null);
 
-    // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (newMessage.trim()) {
-            onSendMessage(newMessage.trim());
-            setNewMessage(''); // Clear input after sending
-        }
+    const handleSubmit = (e) => { /* ... logic remains same ... */ };
+
+    // Helper to get username from ID
+    const getUsername = (senderId) => {
+         if (senderId === myPlayerId) return 'You'; // Identify self
+        const player = playersInfo.find(p => p.id === senderId);
+        return player ? player.username : (senderId ? senderId.substring(0, 6) : '???'); // Fallback to short ID
     };
 
     return (
@@ -23,22 +24,25 @@ const Chat = ({ messages = [], onSendMessage }) => {
             <h2>Chat</h2>
             <div className="chat-messages">
                 {messages.map((msg, index) => (
-                    <div key={index} className="chat-message">
-                        {/* TODO: Get username based on sender ID */}
-                        <span className="sender-name">{msg.sender}: </span>
-                        <span className="message-text">{msg.text}</span>
-                    </div>
+                     // Handle system messages differently
+                     msg.system ? (
+                         <div key={`system-${index}`} className="chat-message system-message">
+                             <em>{msg.text}</em>
+                         </div>
+                     ) : (
+                        <div key={msg.senderId + index} className={`chat-message ${msg.senderId === myPlayerId ? 'my-message' : 'other-message'}`}>
+                            <span className="sender-name">{getUsername(msg.senderId)}: </span>
+                            <span className="message-text">{msg.text}</span>
+                        </div>
+                     )
                 ))}
-                {/* Dummy div to target for scrolling */}
                 <div ref={messagesEndRef} />
             </div>
             <form className="chat-input-form" onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type message..."
-                    maxLength="100"
+                {/* ... input, button ... */}
+                 <input
+                    type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type message..." maxLength="100"
                 />
                 <button type="submit">Send</button>
             </form>

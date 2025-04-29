@@ -1,0 +1,52 @@
+/* Basic Tile Styling */
+.tile {
+    --tile-size: 50px; /* Define tile size variable */
+    width: var(--tile-size);
+    height: var(--tile-size);
+    background-color: #f5eec6; /* Beige tile color */
+    border: 1px solid #bdae8c;
+    border-radius: 5px;
+    box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-family: Arial, sans-serif;
+    cursor: grab; /* Indicate draggable */
+    user-select: none; /* Prevent text selection */
+    box-sizing: border-box; /* Include padding/border in size */
+}
+
+.tile.blank-tile {
+    background-color: #e4d9c0; /* Slightly different color for blank */
+     cursor: default; /* Usually blanks are assigned a letter first */
+}
+
+.tile[draggable="false"] {
+    cursor: default; /* Not draggable */
+}
+
+.tile-letter {
+    font-size: calc(var(--tile-size) * 0.6); /* Scale letter size */
+    font-weight: bold;
+    color: #333;
+    line-height: 1; /* Adjust for better vertical centering */
+    margin-bottom: -2px; /* Fine-tune positioning */
+}
+
+.tile-value {
+    font-size: calc(var(--tile-size) * 0.25); /* Scale value size */
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    color: #555;
+}
+
+/* Style for when a tile is being actively dragged */
+.tile.dragging {
+    opacity: 0.6;
+    border: 2px dashed #555;
+    transform: scale(1.05); /* Slightly larger */
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+}

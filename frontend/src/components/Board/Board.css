@@ -1,0 +1,72 @@
+/* Basic Board Styling */
+.scrabble-board {
+    display: grid;
+    /* Create a 15x15 grid */
+    grid-template-columns: repeat(15, var(--square-size, 40px));
+    grid-template-rows: repeat(15, var(--square-size, 40px));
+    border: 2px solid #333;
+    width: calc(15 * var(--square-size, 40px)); /* Adjust width based on square size */
+    margin: 20px auto; /* Center the board */
+    background-color: #c5bca0; /* Classic board-like background */
+}
+
+.board-row {
+    /* Rows are implicitly handled by the grid */
+    display: contents; /* Important for grid layout */
+}
+
+.board-loading {
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+    color: #555;
+}
+
+/* --- Square Styling (can also be in Square.css) --- */
+.square {
+    border: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative; /* For positioning premium text or tiles */
+    background-color: #e4d9c0; /* Default square color */
+    font-size: 10px; /* For premium text */
+    color: rgba(0, 0, 0, 0.7);
+    text-align: center;
+    user-select: none; /* Prevent text selection */
+    box-sizing: border-box; /* Include padding/border in element's total width/height */
+}
+
+.square.occupied {
+   /* Style for squares with tiles */
+   /* Usually the tile itself provides the look */
+}
+
+/* Premium Square Colors */
+.square.triple-word { background-color: #ff6a6a; color: white; } /* Red */
+.square.double-word { background-color: #ffb6c1; color: #5b3a3e;} /* Pink */
+.square.triple-letter { background-color: #4169e1; color: white; } /* Blue */
+.square.double-letter { background-color: #add8e6; color: #2a4d69;} /* Light Blue */
+
+/* Center Square (often DW color or special marker) */
+.square.center-square {
+    background-color: #ffb6c1; /* Default to DW */
+    position: relative;
+}
+
+.center-star {
+    position: absolute;
+    font-size: calc(var(--square-size, 40px) * 0.6); /* Adjust size relative to square */
+    color: #ffcc00; /* Gold star */
+    pointer-events: none; /* Don't interfere with drop events */
+    opacity: 0.8;
+}
+
+
+/* Premium text styling */
+.premium-text {
+    display: block; /* Make span take up space */
+    line-height: 1.1;
+    font-weight: bold;
+    pointer-events: none; /* Don't interfere with drop events */
+}

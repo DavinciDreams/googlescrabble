@@ -1,0 +1,53 @@
+scrabble-game/
+├── backend/
+│   ├── game/
+│   │   ├── constants.js         # Tile distributions, scores, board layout
+│   │   ├── gameLogic.js         # Core Scrabble rules (validation, scoring)
+│   │   ├── gameManager.js       # Manages multiple active games
+│   │   └── gameState.js         # Represents state of a single game instance
+│   ├── utils/
+│   │   └── dictionary.js        # Loads and checks words against a dictionary
+│   ├── data/
+│   │   └── dictionary.txt       # Word list (e.g., TWL06, SOWPODS - needs to be sourced)
+│   ├── node_modules/            # Backend dependencies (created by npm/yarn)
+│   ├── server.js                # Main server entry point (Express + Socket.IO setup)
+│   ├── package.json             # Backend dependencies and scripts
+│   └── .gitignore               # Specifies intentionally untracked files for Git
+│
+└── frontend/
+    ├── public/
+    │   ├── index.html           # Main HTML file
+    │   └── ...                  # Other static assets (favicons, etc.)
+    ├── src/
+    │   ├── components/          # Reusable UI components
+    │   │   ├── Board/
+    │   │   │   ├── Board.js
+    │   │   │   ├── Square.js
+    │   │   │   └── Board.css
+    │   │   ├── Rack/
+    │   │   │   ├── Rack.js
+    │   │   │   └── Rack.css
+    │   │   ├── Tile/
+    │   │   │   ├── Tile.js
+    │   │   │   └── Tile.css
+    │   │   ├── Scoreboard/
+    │   │   │   └── Scoreboard.js
+    │   │   ├── Controls/
+    │   │   │   └── Controls.js
+    │   │   ├── Chat/
+    │   │   │   └── Chat.js
+    │   │   └── GameInfo/
+    │   │       └── GameInfo.js
+    │   ├── services/
+    │   │   └── socketService.js   # Manages WebSocket connection and events
+    │   ├── contexts/              # (Optional) React Context for state management
+    │   │   └── GameContext.js
+    │   ├── hooks/                 # (Optional) Custom React Hooks
+    │   │   └── useGame.js
+    │   ├── assets/                # Images, fonts etc.
+    │   ├── App.js                 # Main application component
+    │   ├── index.js               # Frontend entry point (renders App)
+    │   └── App.css                # Global styles
+    ├── node_modules/            # Frontend dependencies (created by npm/yarn)
+    ├── package.json             # Frontend dependencies and scripts
+    └── .gitignore               # Specifies intentionally untracked files for Git

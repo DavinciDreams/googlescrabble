@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 // In development, this relies on the "proxy" setting in package.json to forward requests.
 // In production, replace 'YOUR_PRODUCTION_SERVER_URL' with your actual deployed server URL.
 const SOCKET_URL = process.env.NODE_ENV === 'production'
-    ? 'http://localhost:3001' // Replace with your production backend URL
+    ? 'https://googlescrabble.onrender.com' // Replace with your production backend URL
     : 'http://localhost:3001'; // Assuming backend runs on 3001 locally if no proxy or direct connection needed
 
 // Create the socket instance

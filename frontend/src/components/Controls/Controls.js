@@ -1,33 +1,56 @@
 import React from 'react';
 import './Controls.css';
 
-// Directly use handlers passed as props
+/**
+ * Game action buttons.
+ * @param {object} props
+ * @param {Function} props.onPlay - Callback function for playing a move.
+ * @param {Function} props.onPass - Callback function for passing the turn.
+ * @param {Function} props.onExchange - Callback function for initiating tile exchange.
+ * @param {boolean} [props.disabled=false] - General disable flag (e.g., not connected, not turn).
+ * @param {boolean} [props.playDisabled=false] - Specific flag to disable Play (e.g., no tiles placed).
+ * @param {boolean} [props.exchangeDisabled=false] - Specific flag to disable Exchange (e.g., no tiles selected).
+ */
 const Controls = ({
     onPlay,
     onPass,
     onExchange,
-    disabled = false,
-    // Add props related to exchange button state if needed
-    // exchangeDisabled = false // Example: disable if nothing selected
+    disabled = false,        // General disabled state
+    playDisabled = false,    // Specific disable for Play button
+    exchangeDisabled = false // Specific disable for Exchange button
 }) => {
-
-    // No internal handlers needed here anymore
-    // Logic is handled in App.js which passes the relevant functions (handlePlayMove, etc.)
 
     return (
         <div className="game-controls">
-            {/* Play button uses the main 'disabled' prop */}
-            <button onClick={onPlay} disabled={disabled}>
+            {/* Play is disabled if general OR specific play condition met */}
+            <button
+                onClick={onPlay}
+                disabled={disabled || playDisabled}
+                title={disabled ? "Cannot interact now" : (playDisabled ? "Place tiles on board first" : "Submit placed tiles")}
+            >
                 Play Word
             </button>
-            <button onClick={onPass} disabled={disabled}>
+
+            {/* Pass is only disabled by the general state */}
+            <button
+                onClick={onPass}
+                disabled={disabled}
+                title={disabled ? "Cannot interact now" : "Pass your turn"}
+            >
                 Pass Turn
             </button>
-            {/* Exchange button might need its own disabled logic based on selection */}
-            <button onClick={onExchange} disabled={disabled /* || exchangeDisabled */ }>
+
+            {/* Exchange is disabled if general OR specific exchange condition met */}
+            <button
+                onClick={onExchange}
+                disabled={disabled || exchangeDisabled}
+                title={disabled ? "Cannot interact now" : (exchangeDisabled ? "Select tiles from rack first" : "Exchange selected tiles")}
+            >
                 Exchange Tiles
             </button>
-            {/* Optional: <button onClick={onShuffle} disabled={disabled}>Shuffle Rack</button> */}
+
+            {/* Optional Shuffle button (could be added later) */}
+            {/* <button onClick={onShuffle} disabled={disabled}>Shuffle Rack</button> */}
         </div>
     );
 };

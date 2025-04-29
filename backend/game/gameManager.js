@@ -9,65 +9,103 @@ const activeGames = new Map();
 const playerGameMap = new Map();
 
 /**
- * Finds an available game waiting for players or creates a new one.
- * Adds the player to the selected game.
+ * Handles a player's request to join a game.
+ * If targetGameId is provided, attempts to join that specific game.
+ * Otherwise, finds an available game or creates a new one.
  *
  * @param {string} playerId - The socket ID of the player.
  * @param {string} username - The player's chosen username.
+ * @param {string | null} targetGameId - The specific game ID the player wants to join, or null.
  * @returns {object} - { gameId: string, gameState: GameState, error?: string }
  */
-function findOrCreateGame(playerId, username) {
-    // Check if player is already in a game
+function handleJoinRequest(playerId, username, targetGameId = null) {
+    // Check if player is already in a game (handle re-connection/duplicate join attempt)
     if (playerGameMap.has(playerId)) {
         const existingGameId = playerGameMap.get(playerId);
         if (activeGames.has(existingGameId)) {
-             console.log(`Player ${playerId} trying to join, but already in game ${existingGameId}`);
-             return { gameId: existingGameId, gameState: activeGames.get(existingGameId) }; // Rejoin maybe? Or return error? For now, let them rejoin state.
+            console.log(`Game Manager: Player ${playerId} attempting to join, but already in game ${existingGameId}. Returning existing game.`);
+            // If they provided a *different* targetGameId, return an error.
+             if (targetGameId && targetGameId !== existingGameId) {
+                 return { error: `You are already in game ${existingGameId}. Leave that game first.` };
+             }
+            return { gameId: existingGameId, gameState: activeGames.get(existingGameId) };
         } else {
-            // Map exists but game doesn't - cleanup map
-            playerGameMap.delete(playerId);
+            playerGameMap.delete(playerId); // Clean up stale map entry
         }
     }
 
-    let availableGameId = null;
-    let gameToJoin = null;
+    // --- Handle Joining Specific Game ---
+    if (targetGameId) {
+        console.log(`Game Manager: Player ${playerId} attempting to join specific game ${targetGameId}`);
+        const specificGame = activeGames.get(targetGameId);
+        if (!specificGame) {
+             console.warn(`Game Manager: Join failed for ${playerId}. Game '${targetGameId}' not found.`);
+            return { error: `Game with ID '${targetGameId}' not found.` };
+        }
+        if (specificGame.status !== 'waiting') {
+             console.warn(`Game Manager: Join failed for ${playerId}. Game '${targetGameId}' status is ${specificGame.status}.`);
+            return { error: `Game '${targetGameId}' has already started or is finished.` };
+        }
+        if (specificGame.players.length >= specificGame.maxPlayers) {
+             console.warn(`Game Manager: Join failed for ${playerId}. Game '${targetGameId}' is full (${specificGame.players.length}/${specificGame.maxPlayers}).`);
+            return { error: `Game '${targetGameId}' is full.` };
+        }
 
-    // Look for a waiting game (e.g., only 1 player)
-    for (const [gameId, gameState] of activeGames.entries()) {
-        // Define 'waiting' criteria (e.g., status is 'waiting' and not full)
-        if (gameState.status === 'waiting' && gameState.players.length < 2) { // Simple 2-player logic for now
-            availableGameId = gameId;
-            gameToJoin = gameState;
-            break;
+        // Attempt to add player to the specific game state
+        const player = specificGame.addPlayer(playerId, username);
+        if (player) {
+            playerGameMap.set(playerId, targetGameId);
+            console.log(`Game Manager: Player ${playerId} successfully joined specific game ${targetGameId}`);
+            return { gameId: targetGameId, gameState: specificGame };
+        } else {
+             // addPlayer failed (e.g., username taken in that game) - GameState log should explain why
+             // Retrieve specific reason from GameState if possible, otherwise use generic message
+             console.error(`Game Manager: GameState.addPlayer failed for ${playerId} in specific game ${targetGameId}.`);
+            return { error: `Failed to join game '${targetGameId}'. Username might be taken in that game.` }; // Provide more specific error if addPlayer returns one
         }
     }
+    // --- Handle Find or Create (if no specific game ID given) ---
+    else {
+        console.log(`Game Manager: Player ${playerId} looking for waiting game or creating new.`);
+        let availableGameId = null;
+        let gameToJoin = null;
 
-    if (gameToJoin && availableGameId) {
-        // Found a waiting game, add player
-        console.log(`Game Manager: Adding player ${playerId} (${username}) to existing game ${availableGameId}`);
-        const player = gameToJoin.addPlayer(playerId, username);
-        if (player) {
-            playerGameMap.set(playerId, availableGameId);
-            return { gameId: availableGameId, gameState: gameToJoin };
-        } else {
-            // Should not happen if checks above are correct, but handle defensively
-             console.error(`Game Manager: Failed to add player ${playerId} to game ${availableGameId} despite finding it.`);
-             return { error: 'Failed to add player to waiting game.' };
+        // Find a game that is 'waiting' and has room
+        for (const [gameId, gameState] of activeGames.entries()) {
+            if (gameState.status === 'waiting' && gameState.players.length < gameState.maxPlayers) {
+                availableGameId = gameId;
+                gameToJoin = gameState;
+                break;
+            }
         }
-    } else {
-        // No waiting games found, create a new one
-        const newGameId = `game-${uuidv4()}`;
-        console.log(`Game Manager: Creating new game ${newGameId} for player ${playerId} (${username})`);
-        const newGameState = new GameState(newGameId);
-        const player = newGameState.addPlayer(playerId, username);
 
-        if (player) {
-            activeGames.set(newGameId, newGameState);
-            playerGameMap.set(playerId, newGameId);
-            return { gameId: newGameId, gameState: newGameState };
+        if (gameToJoin && availableGameId) {
+            // Found a waiting game
+            console.log(`Game Manager: Adding player ${playerId} (${username}) to waiting game ${availableGameId}`);
+            const player = gameToJoin.addPlayer(playerId, username);
+            if (player) {
+                playerGameMap.set(playerId, availableGameId);
+                return { gameId: availableGameId, gameState: gameToJoin };
+            } else {
+                 console.error(`Game Manager: GameState.addPlayer failed for ${playerId} in waiting game ${availableGameId}.`);
+                return { error: 'Failed to add player to waiting game.' }; // Provide more specific error if addPlayer returns one
+            }
         } else {
-             console.error(`Game Manager: Failed to add player ${playerId} to newly created game ${newGameId}.`);
-             return { error: 'Failed to create game or add player.' };
+            // No suitable waiting games, create a new one
+            const newGameId = `game-${uuidv4().substring(0, 8)}`; // Shorter, more shareable ID
+            console.log(`Game Manager: Creating new game ${newGameId} for player ${playerId} (${username})`);
+            const newGameState = new GameState(newGameId); // GameState constructor should set default maxPlayers
+            const player = newGameState.addPlayer(playerId, username);
+
+            if (player) {
+                activeGames.set(newGameId, newGameState);
+                playerGameMap.set(playerId, newGameId);
+                return { gameId: newGameId, gameState: newGameState };
+            } else {
+                 // This should ideally not fail for the first player unless username invalid?
+                 console.error(`Game Manager: Failed to add initial player ${playerId} to newly created game ${newGameId}.`);
+                 return { error: 'Failed to create game or add initial player.' }; // Provide more specific error if addPlayer returns one
+            }
         }
     }
 }
@@ -89,10 +127,10 @@ function getGameState(gameId) {
  */
 function maybeStartGame(gameId) {
      const gameState = activeGames.get(gameId);
-     // Example: Start game if 2 players are present and it's waiting
-     if (gameState && gameState.status === 'waiting' && gameState.players.length === 2) {
-        console.log(`Game Manager: Starting game ${gameId}`);
-        return gameState.startGame(); // startGame should handle setting status, turns, etc.
+     // Start game if waiting and has reached max players
+     if (gameState && gameState.status === 'waiting' && gameState.players.length === gameState.maxPlayers) {
+        console.log(`Game Manager: Starting game ${gameId} as it has ${gameState.players.length} players.`);
+        return gameState.startGame();
      }
      return false;
  }
@@ -100,20 +138,22 @@ function maybeStartGame(gameId) {
 
 /**
  * Removes a player from their game upon disconnection.
+ * Handles game state updates like advancing turns or ending the game.
  * @param {string} playerId - The socket ID of the disconnecting player.
- * @returns {{ gameId: string, wasGameRemoved: boolean, remainingPlayers: Array } | null} - Info about the game or null if player wasn't found.
+ * @returns {{ gameId: string, wasGameRemoved: boolean, remainingPlayers: Array, notifyOthers: boolean, updatedGameState: GameState | null } | null} - Info about the game or null if player wasn't found.
  */
 function removePlayer(playerId) {
     const gameId = playerGameMap.get(playerId);
     if (!gameId) {
-        console.log(`Game Manager: Player ${playerId} disconnected, but was not mapped to a game.`);
+        // Player wasn't mapped, maybe disconnected before joining fully
         return null;
     }
 
     const gameState = activeGames.get(gameId);
+    playerGameMap.delete(playerId); // Remove from mapping regardless of game state
+
     if (!gameState) {
-        console.log(`Game Manager: Player ${playerId} disconnected, game ${gameId} not found in active games.`);
-        playerGameMap.delete(playerId); // Clean up map entry
+        console.log(`Game Manager: Player ${playerId} disconnected, game ${gameId} not found in active games (already removed?).`);
         return null;
     }
 
@@ -122,8 +162,13 @@ function removePlayer(playerId) {
 
     if (playerIndex === -1) {
         console.warn(`Game Manager: Player ${playerId} not found in game state for ${gameId} during removal.`);
-        playerGameMap.delete(playerId); // Clean up map entry
-        return null;
+        // If player not found but game exists, check if game is now empty
+        if (gameState.players.length === 0) {
+             console.log(`Game Manager: Game ${gameId} became empty after player lookup failed, removing.`);
+             activeGames.delete(gameId);
+             return { gameId, wasGameRemoved: true, remainingPlayers: [], notifyOthers: false, updatedGameState: null };
+        }
+        return null; // Player wasn't in the list, nothing more to do for them
     }
 
     // Store info before removing
@@ -132,42 +177,50 @@ function removePlayer(playerId) {
 
     // Remove the player from the game state
     gameState.players.splice(playerIndex, 1);
-    playerGameMap.delete(playerId); // Remove from mapping
 
     // Handle game state changes due to player leaving
     if (gameState.players.length === 0) {
-        console.log(`Game Manager: Game ${gameId} is empty, removing.`);
+        // Game is empty, remove it
+        console.log(`Game Manager: Game ${gameId} is now empty, removing.`);
         activeGames.delete(gameId);
-        return { gameId, wasGameRemoved: true, remainingPlayers: [] };
+        return { gameId, wasGameRemoved: true, remainingPlayers: [], notifyOthers: false, updatedGameState: null };
     } else {
-        // If the game was playing and the leaving player had the turn, advance it
+        // Game continues, adjust turn if necessary
+        let turnAdvanced = false;
         if (gameState.status === 'playing') {
+            // Recalculate currentTurnIndex based on remaining players
             if (wasCurrentTurn) {
-                 // Adjust currentTurnIndex carefully if the leaving player was before the next player in the array
-                if (playerIndex < gameState.currentTurnIndex) {
-                    gameState.currentTurnIndex = (gameState.currentTurnIndex - 1 + gameState.players.length) % gameState.players.length; // Adjust index backward
-                } else {
-                     // If the leaving player was the last in array and had turn, wrap to 0
-                     gameState.currentTurnIndex %= gameState.players.length;
-                }
-                 // Make the new current player's turn true (if players remain)
-                if(gameState.players.length > 0) {
-                    gameState.players[gameState.currentTurnIndex].isTurn = true;
-                }
-                console.log(`Game Manager: Player ${playerId} left on their turn. New turn index: ${gameState.currentTurnIndex}`);
+                 // If the leaving player had the turn, the next player (or wrapping around) gets it
+                 // The modulo operator handles the wrap-around correctly after splice
+                gameState.currentTurnIndex %= gameState.players.length;
+                gameState.players[gameState.currentTurnIndex].isTurn = true; // Assign turn
+                console.log(`Game Manager: Player ${playerId} left on their turn. New turn assigned to ${gameState.players[gameState.currentTurnIndex].username}.`);
+                turnAdvanced = true;
              } else {
-                 // If leaving player was not the current turn, we might need to adjust the index if they were before the current player
-                 if (playerIndex < gameState.currentTurnIndex) {
-                     gameState.currentTurnIndex = (gameState.currentTurnIndex - 1 + gameState.players.length) % gameState.players.length;
+                 // If leaving player was not the current turn, adjust index if they were before the current player
+                 // Find the ID of the player who *currently* has the turn
+                 const currentPlayerIdBeforeRemoval = gameState.players[gameState.currentTurnIndex]?.id;
+                 // If the current player still exists, find their *new* index
+                 const newCurrentTurnIndex = gameState.players.findIndex(p => p.id === currentPlayerIdBeforeRemoval);
+
+                 if (newCurrentTurnIndex !== -1) {
+                     gameState.currentTurnIndex = newCurrentTurnIndex;
+                     // Ensure isTurn is still true for the correct player
+                     gameState.players.forEach((p, index) => p.isTurn = (index === newCurrentTurnIndex));
+                 } else {
+                      // Should not happen if wasCurrentTurn was false, indicates state inconsistency
+                      console.error(`Game Manager: Current turn player ID ${currentPlayerIdBeforeRemoval} not found after removing ${playerId}. Resetting turn.`);
+                      // Fallback: just assign turn to index 0
+                      gameState.currentTurnIndex = 0;
+                       if(gameState.players.length > 0) gameState.players[0].isTurn = true;
+                       turnAdvanced = true; // Consider this an advancement
                  }
-                 // Ensure index is still valid
-                  gameState.currentTurnIndex %= gameState.players.length;
              }
-             // TODO: Implement game over logic if only one player remains in a 'playing' game?
-             if (gameState.players.length < 2) { // Example: End game if only one left
-                 console.log(`Game Manager: Only one player left in game ${gameId}. Ending game.`);
-                 gameState.status = 'finished';
-                 // Assign winner or handle scoring?
+
+             // Check if the game should end because only one player remains
+             if (gameState.players.length < 2) {
+                 console.log(`Game Manager: Only one player left in playing game ${gameId}. Ending game.`);
+                 gameState._endGame('player_left'); // Call internal end game method
              }
         }
 
@@ -175,16 +228,18 @@ function removePlayer(playerId) {
         return {
             gameId,
             wasGameRemoved: false,
-            remainingPlayers: gameState.players.map(p => ({ id: p.id, username: p.username })), // Return public info
-            notifyOthers: true, // Flag to notify others in server.js
-            updatedGameState: gameState // Pass back the updated state
+            remainingPlayers: gameState.players.map(p => ({ id: p.id, username: p.username })),
+            notifyOthers: true, // Let server.js know to notify remaining players
+            updatedGameState: gameState // Pass back the modified state
         };
     }
 }
 
+
 module.exports = {
-    findOrCreateGame,
+    handleJoinRequest,
     getGameState,
     maybeStartGame,
     removePlayer,
+    // Consider adding functions to get game list or specific game details if needed later
 };

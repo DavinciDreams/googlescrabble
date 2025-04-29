@@ -1,102 +1,136 @@
+// backend/server.js
+
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
-// TODO: Import game logic/management functions later
-// const gameManager = require('./game/gameManager');
+const gameManager = require('./game/gameManager'); // Import the game manager
+
+const PORT = process.env.PORT || 3001; // Use Render's port or 3001 locally
 
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.IO
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allow connections from any origin for now (adjust for production)
+        origin: "*", // Consider restricting in production: e.g., process.env.FRONTEND_URL
         methods: ["GET", "POST"]
     }
 });
 
-// Basic route (optional, useful for health checks)
 app.get('/', (req, res) => {
     res.send('Scrabble Server is running!');
 });
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`); // You are seeing this
+    const playerId = socket.id; // Store player ID
+    console.log(`User connected: ${playerId}`);
 
-    // --- THIS IS THE BLOCK TO DEBUG ---
     socket.on('joinGame', (data) => {
-        // You are seeing this log:
-        console.log(`Player ${socket.id} wants to join/create game with data:`, data);
+        // Validate input data
+        if (!data || typeof data.username !== 'string' || data.username.trim().length === 0) {
+            console.error(`Invalid joinGame data from ${playerId}:`, data);
+            socket.emit('gameError', { message: 'Invalid username provided.' });
+            return;
+        }
+        const username = data.username.trim();
 
-        // --- WHAT HAPPENS NEXT? ---
-        // TODO: Logic to find or create a game, add player
-        // Are you actually calling functions to manage games? (e.g., gameManager)
-        // Does this logic work correctly? Add logs inside it.
+        console.log(`Player ${playerId} wants to join/create game with username: ${username}`);
 
-        // Example placeholder logic (REPLACE WITH YOUR ACTUAL LOGIC):
-        const tempGameId = 'game123'; // Placeholder
-        const playerAdded = true; // Placeholder
-        const initialGameState = { /* some placeholder state */ }; // Placeholder
+        try {
+            const { gameId, gameState, error } = gameManager.findOrCreateGame(playerId, username);
 
-        if (playerAdded && tempGameId) {
-            console.log(`Attempting to add player ${socket.id} to room ${tempGameId}`); // <-- ADD LOG
-            socket.join(tempGameId); // Join the Socket.IO room for broadcast
+            if (error || !gameId || !gameState) {
+                console.error(`Failed to process joinGame for ${playerId}: ${error || 'Unknown reason'}`);
+                socket.emit('gameError', { message: error || 'Failed to join or create game.' });
+                return;
+            }
 
-            console.log(`Attempting to emit 'gameJoined' to ${socket.id}`); // <-- ADD LOG
-            // ---> THIS EMIT IS CRITICAL <---
-            // Are you emitting the 'gameJoined' event correctly?
-            // Does 'getPlayerSpecificState' exist and return valid data?
-            // Replace placeholder 'initialGameState' with your actual game state object
-            socket.emit('gameJoined', initialGameState /* gameState.getPlayerSpecificState(socket.id) */);
+            console.log(`Player ${playerId} joining room ${gameId}`);
+            socket.join(gameId); // Join the Socket.IO room
 
-            console.log(`Attempting to emit 'playerJoined' to room ${tempGameId}`); // <-- ADD LOG
-            // Notify others in the room (optional but good)
-            // Replace placeholder data with actual player info
-            io.to(tempGameId).emit('playerJoined', { playerId: socket.id, username: data.username });
+            // Send the initial state *specifically* to the joining player
+            const playerSpecificState = gameState.getPlayerSpecificState(playerId);
+            console.log(`Emitting 'gameJoined' to ${playerId}`); // Removed state logging for brevity
+            socket.emit('gameJoined', playerSpecificState);
 
-        } else {
-            console.error(`Failed to add player ${socket.id} to a game.`); // <-- ADD LOG
-            // Emit an error back if joining/creation failed
-            socket.emit('gameError', { message: 'Failed to join or create game.' }); // <-- ARE YOU EMITTING ERRORS?
+            // Notify *other* players in the room that someone joined
+            const playerPublicInfo = { playerId: playerId, username: username, score: 0 }; // Get score from state if needed
+            console.log(`Emitting 'playerJoined' to room ${gameId}`);
+            socket.to(gameId).emit('playerJoined', playerPublicInfo); // Use socket.to to exclude sender
+
+            // Check if the game can start now
+            const gameStarted = gameManager.maybeStartGame(gameId);
+            if (gameStarted) {
+                // If game started, send an update to everyone in the room
+                console.log(`Game ${gameId} started! Emitting initial gameUpdate.`);
+                // Use gameState.getPublicState() for general updates
+                io.to(gameId).emit('gameUpdate', gameState.getPublicState());
+            }
+
+        } catch (err) {
+            console.error(`CRITICAL ERROR processing joinGame for ${playerId}:`, err);
+            socket.emit('gameError', { message: 'Internal server error while joining game.' });
         }
     });
-    // --- END OF BLOCK TO DEBUG ---
 
+    // --- Placeholder Event Handlers ---
+    // TODO: Implement these using gameManager.getGameState(gameId) to get the state
     socket.on('placeTiles', (data) => {
-        // TODO: Validate move, update game state, broadcast update
-        console.log(`Player ${socket.id} placed tiles:`, data);
-        // Example: const isValid = gameLogic.validateMove(gameId, socket.id, data.move);
-        // Example: if (isValid) { ... update state ... io.to(gameId).emit('gameUpdate', newGameState); }
-        // Example: else { socket.emit('invalidMove', { message: '...' }); }
+        // 1. Get gameId from data or playerGameMap
+        // 2. Get gameState = gameManager.getGameState(gameId)
+        // 3. Validate move using gameState and gameLogic
+        // 4. If valid, update gameState
+        // 5. Emit 'gameUpdate' to room: io.to(gameId).emit('gameUpdate', gameState.getPublicState());
+        // 6. Emit 'invalidMove' on error: socket.emit('invalidMove', ...);
+        console.log(`Player ${playerId} placed tiles:`, data);
+        console.warn("placeTiles handler not fully implemented.");
     });
 
-    socket.on('passTurn', () => {
-         // TODO: Update game state (change turn), broadcast update
-        console.log(`Player ${socket.id} passed turn.`);
+    socket.on('passTurn', (data) => { // Expect { gameId }
+        // Similar logic: get gameId, get gameState, call gameState.passTurn(playerId), emit 'gameUpdate'
+        console.log(`Player ${playerId} passed turn.`);
+         console.warn("passTurn handler not fully implemented.");
     });
 
-    socket.on('exchangeTiles', (tilesToExchange) => {
-         // TODO: Validate exchange, update rack/bag, broadcast update
-        console.log(`Player ${socket.id} wants to exchange tiles:`, tilesToExchange);
+    socket.on('exchangeTiles', (data) => { // Expect { gameId, tiles }
+        // Similar logic: get gameId, get gameState, call gameState.exchangeTiles(playerId, tiles), emit 'gameUpdate'
+        console.log(`Player ${playerId} wants to exchange tiles:`, data);
+         console.warn("exchangeTiles handler not fully implemented.");
     });
 
-    socket.on('chatMessage', (message) => {
-        // TODO: Broadcast message to others in the same game room
-        console.log(`Player ${socket.id} sent message:`, message);
-        // Example: io.to(gameId).emit('newChatMessage', { sender: socket.id, text: message });
+    socket.on('chatMessage', (data) => { // Expect { gameId, message }
+        if (!data || !data.gameId || !data.message) return;
+        const gameId = data.gameId;
+        // Basic broadcast, maybe add sender info later
+        console.log(`Player ${playerId} sent message in ${gameId}:`, data.message);
+        // Use socket.to() to exclude sender from receiving their own message via broadcast
+        socket.to(gameId).emit('newChatMessage', { senderId: playerId, /* username? */ text: data.message });
     });
 
 
     // Handle disconnections
-    socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
-        // TODO: Remove player from game, notify others, handle game ending if necessary
-        // Example: gameManager.removePlayer(socket.id);
+    socket.on('disconnect', (reason) => {
+        console.log(`User disconnected: ${playerId}. Reason: ${reason}`);
+        try {
+            const removalInfo = gameManager.removePlayer(playerId);
+
+            if (removalInfo && removalInfo.notifyOthers && removalInfo.gameId) {
+                 const { gameId, updatedGameState } = removalInfo;
+                 console.log(`Notifying room ${gameId} that player ${playerId} left.`);
+                 // Notify remaining players
+                 io.to(gameId).emit('playerLeft', { playerId: playerId /* add username? */ });
+                 // Send update if game state changed (e.g., turn advanced, game ended)
+                 if (updatedGameState) {
+                      io.to(gameId).emit('gameUpdate', updatedGameState.getPublicState());
+                 }
+            } else if (removalInfo && removalInfo.wasGameRemoved) {
+                 console.log(`Game ${removalInfo.gameId} was removed.`);
+            }
+        } catch(err) {
+             console.error(`Error processing disconnect for ${playerId}:`, err);
+        }
     });
 });
-
-// Near the top/middle where you define PORT:
-const PORT = process.env.PORT || 3001; // Use Render's port or 3001 locally
 
 // Near the bottom where you start the server:
 server.listen(PORT, () => {

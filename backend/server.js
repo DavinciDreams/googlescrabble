@@ -71,8 +71,8 @@ io.on('connection', (socket) => {
         // ... (logging, input validation) ...
         try {
             const gameState = gameManager.getGameState(gameId);
-            // ... (game state validation) ...
-
+            if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
+            if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game not active (${gameState.status}).` });
             const result = gameState.placeValidMove(playerId, move); // Delegate
 
             if (result.success) {
@@ -82,10 +82,13 @@ io.on('connection', (socket) => {
                 console.log(`   Sent public gameUpdate to all in room ${gameId}`);
                 // --- END FIX ---
 
-                if (result.gameOver) { /* ... emit gameOver ... */ }
+                if (result.gameOver)
+                    console.log(`Game ${gameId} ended. Reason: ${result.reason || 'tiles'}`);
+                     io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: result.reason || 'tiles' });
             } else {
-                // ... (emit invalidMove to sender) ...
-            }
+                console.warn(`Invalid move by ${playerId} in ${gameId}: ${result.error}`);
+                socket.emit('invalidMove', { message: result.error || 'Invalid move.' });
+            }            }
         } catch (err) { /* ... error handling ... */ }
     });
 
@@ -116,7 +119,7 @@ io.on('connection', (socket) => {
         const { gameId, tiles } = data || {};
          console.log(`Received 'exchangeTiles' from ${playerId} for ${gameId} with tiles: ${tiles?.join(',')}`);
          if (!gameId || !Array.isArray(tiles) || tiles.length === 0) { return socket.emit('gameError', { message: 'Invalid exchange data.' }); }
-        // ... (validation) ...
+            if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game not active (${gameState.status}).` });
          try {
             const gameState = gameManager.getGameState(gameId);
             // ... (game state validation) ...

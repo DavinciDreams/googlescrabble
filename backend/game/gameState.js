@@ -143,7 +143,7 @@ class GameState {
         for (let i = 0; i < numToDraw; i++) {
             const tile = this.tileBag.pop(); // Remove from end of shuffled bag
             if (tile) { drawnTiles.push(tile); }
-            else { console.error(`GameState ${this.gameId}: tileBag.pop() returned undefined unexpectedly.`); break; }
+            else { console.error(`GameState [${this.gameId}]: tileBag.pop() returned undefined unexpectedly.`); break; }
         }
         player.rack.push(...drawnTiles); // Add the drawn tiles to the player's rack
         console.log(`GameState [${this.gameId}]: Player ${player.username} drew ${drawnTiles.length} tiles. New rack size: ${player.rack.length}. Bag remaining: ${this.tileBag.length}`);
@@ -167,7 +167,7 @@ class GameState {
     advanceTurn() {
         if (this.status !== 'playing' || this.players.length <= 1) {
              if (this.players.length === 1 && this.status === 'playing') {
-                 console.log(`GameState ${this.gameId}: Only one player left, turn not advanced.`);
+                 console.log(`GameState [${this.gameId}]: Only one player left, turn not advanced.`);
                  if(this.players[0]) this.players[0].isTurn = true; // Ensure remaining player has turn
              }
              return;
@@ -180,10 +180,10 @@ class GameState {
         // Ensure the new index is also valid before assigning turn
         if(this.players[this.currentTurnIndex]) {
             this.players[this.currentTurnIndex].isTurn = true;
-            console.log(`GameState ${this.gameId}: Turn advanced to ${this.players[this.currentTurnIndex].username}.`);
+            console.log(`GameState [${this.gameId}]: Turn advanced to ${this.players[this.currentTurnIndex].username}.`);
         } else {
              // This state indicates a serious problem, maybe reset to 0?
-             console.error(`GameState ${this.gameId}: Failed to advance turn, invalid new index ${this.currentTurnIndex}. Resetting turn to player 0.`);
+             console.error(`GameState [${this.gameId}]: Failed to advance turn, invalid new index ${this.currentTurnIndex}. Resetting turn to player 0.`);
              this.currentTurnIndex = 0;
              if(this.players.length > 0 && this.players[0]) this.players[0].isTurn = true;
         }
@@ -197,12 +197,12 @@ class GameState {
         this.consecutivePasses++;
         console.log(`GameState [${this.gameId}]: Player ${playerId} passed. Consecutive passes: ${this.consecutivePasses}`);
 
-        // Example: 6 passes ends the game for 2 players
+        // Example: 6 passes ends the game for 2 players (adjust as needed)
         const maxPasses = this.players.length * 3;
         if (this.consecutivePasses >= maxPasses) {
-            console.log(`GameState ${this.gameId}: Game ending due to ${this.consecutivePasses} consecutive passes.`);
+            console.log(`GameState [${this.gameId}]: Game ending due to ${this.consecutivePasses} consecutive passes.`);
             this._endGame('passes'); // Ends the game and calculates final scores
-            return { success: true, gameOver: true, finalScores: this.finalScores }; // Include finalScores
+            return { success: true, gameOver: true, finalScores: this.finalScores }; // Include final scores
         } else {
             this.advanceTurn();
             return { success: true, gameOver: false };
@@ -237,7 +237,7 @@ class GameState {
                  }
              }
              if (!found) {
-                 console.error(`GameState ${this.gameId}: Tile object mismatch during exchange validation for letter ${letter}.`);
+                 console.error(`GameState [${this.gameId}]: Tile object mismatch during exchange validation for letter ${letter}.`);
                  return { success: false, error: `Internal error validating tile ${letter}.` };
              }
         }
@@ -250,7 +250,7 @@ class GameState {
         this.consecutivePasses = 0; // Exchange resets pass count
         this.advanceTurn();
 
-        console.log(`GameState ${this.gameId}: Player ${playerId} exchanged ${lettersToExchange.length} tiles.`);
+        console.log(`GameState [${this.gameId}]: Player ${playerId} exchanged ${lettersToExchange.length} tiles.`);
         return { success: true };
     }
 
@@ -276,7 +276,7 @@ class GameState {
             }
         }
 
-         // --- 2. Placement Validation (Connectivity, Line, Board State) ---
+         // --- 2. Placement Validation ---
          const placementValidation = this._validatePlacement(move);
          if (!placementValidation.valid) return { success: false, error: placementValidation.error };
          const { orientation, lineCoords } = placementValidation;
@@ -299,7 +299,7 @@ class GameState {
          const totalScore = scoreResult.score;
          const bingoBonus = scoreResult.bingoBonus;
 
-        // --- 5. Update Game State (Board, Score, Rack) ---
+        // --- 5. Update Game State ---
         const rackTilesToRemove = []; // Store actual rack tile objects to remove
         const currentRackCopy = [...player.rack]; // Copy to find specific tile instances
 
@@ -322,16 +322,12 @@ class GameState {
              };
              if (square.premium) square.isPremiumUsed = true; // Mark premium as used
         }
-
         // b. Update player score
         player.score += totalScore;
-
         // c. Remove actual tiles from rack using the tracked objects
         player.rack = player.rack.filter(tile => !rackTilesToRemove.includes(tile));
-
         // d. Draw new tiles
         this.drawTiles(player, move.length);
-
         // e. Update game state properties
         this.consecutivePasses = 0;
         this.isFirstMove = false;
@@ -342,13 +338,14 @@ class GameState {
         this.advanceTurn();
 
         // --- 7. Check for Game Over (Post-Move) ---
-        const gameOverInfo = this._checkGameOver(player); // Pass the player who just moved
+        // Pass the player *whose rack should be checked* (the one who just moved)
+        const gameOverInfo = this._checkGameOver(player);
         if (gameOverInfo.isOver) {
-            console.log(`GameState ${this.gameId}: Game ending. Reason: ${gameOverInfo.reason}`);
+            console.log(`GameState [${this.gameId}]: Game ending. Reason: ${gameOverInfo.reason}`);
              // Return success but also game over flag and final scores
              return { success: true, score: totalScore, gameOver: true, finalScores: this.finalScores };
         } else {
-            console.log(`GameState ${this.gameId}: Player ${playerId} placed move. Score: ${totalScore}.`);
+            console.log(`GameState [${this.gameId}]: Player ${playerId} placed move. Score: ${totalScore}.`);
              return { success: true, score: totalScore, gameOver: false };
         }
     }
@@ -401,10 +398,10 @@ class GameState {
             for (const [dr, dc] of neighbors) {
                 const nr = row + dr; const nc = col + dc;
                 if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
-                    // Must connect to a tile already *on the board* (not part of current move)
+                    // Must connect to a tile already *on the board*
                     if (this.board[nr][nc].tile !== null) {
                         isConnected = true;
-                        break; // Found connection for this tile
+                        break;
                     }
                 }
             }
@@ -413,7 +410,7 @@ class GameState {
 
         if (this.isFirstMove) {
             if (!touchesCenter) return { valid: false, error: 'First move must cover the center square.' };
-            if (move.length < 2 && BOARD_SIZE > 1) return { valid: false, error: 'First move must be at least two letters long.' }; // Allow single tile if board is 1x1? No.
+            if (move.length < 2 && BOARD_SIZE > 1) return { valid: false, error: 'First move must be at least two letters long.' };
         } else { // Not first move
             if (!isConnected && move.length > 0) return { valid: false, error: 'Move must connect to existing tiles.' };
         }
@@ -426,74 +423,82 @@ class GameState {
         const tempBoard = _.cloneDeep(this.board);
         const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`));
 
-        // Place move tiles onto temp board for easy lookup
+        // Place move tiles onto temp board
         for (const tile of move) {
-             // Use the tile's actual letter (could be assigned blank), value doesn't matter for finding words
-             tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value };
+             tempBoard[tile.row][tile.col].tile = {
+                 letter: tile.letter.toUpperCase(),
+                 // Use original value for scoring later, value doesn't affect word finding
+                 value: tile.isBlank ? 0 : (TILE_DISTRIBUTION[tile.letter.toUpperCase()]?.value ?? 0),
+             };
         }
 
         // Helper to get word details along an axis from a starting point
         const checkWord = (startTileCoord, axis) => {
-             let currentWord = '';
-             const currentWordTiles = [];
-             let r = startTileCoord.r;
-             let c = startTileCoord.c;
+             if (!startTileCoord) return;
+             let r = startTileCoord.r; let c = startTileCoord.c;
 
              // Find beginning of the word
-             if (axis === 'H') { while (c > 0 && tempBoard[r][c - 1]?.tile) c--; }
+             if (axis === 'H') { while (c > 0 && tempBoard[r]?.[c - 1]?.tile) c--; }
              else { while (r > 0 && tempBoard[r - 1]?.[c]?.tile) r--; }
 
+             let currentWord = ''; const currentWordTiles = [];
+             let currentPosR = r; let currentPosC = c;
+
              // Read the word tile by tile
-             while (r < BOARD_SIZE && c < BOARD_SIZE && tempBoard[r]?.[c]?.tile) {
-                 const currentSquare = tempBoard[r][c];
-                 const originalSquare = this.board[r][c]; // Use original for premium info
+             while (currentPosR < BOARD_SIZE && currentPosC < BOARD_SIZE && tempBoard[currentPosR]?.[currentPosC]?.tile) {
+                 const currentSquare = tempBoard[currentPosR][currentPosC];
+                 const originalSquare = this.board[currentPosR][currentPosC]; // Need original for premium status
                  currentWord += currentSquare.tile.letter;
                  currentWordTiles.push({
                      letter: currentSquare.tile.letter,
-                     value: originalSquare.tile ? originalSquare.tile.value : TILE_DISTRIBUTION[currentSquare.tile.letter]?.value ?? 0, // Get original value if exists, else lookup
-                     r, c,
+                     // Value will be recalculated during scoring based on original rack tile (for blanks)
+                     value: originalSquare.tile ? originalSquare.tile.value : currentSquare.tile.value, // Use original value if existing tile
+                     r: currentPosR, c: currentPosC,
                      premium: originalSquare.premium,
-                     isPremiumUsed: originalSquare.isPremiumUsed,
-                     isNew: moveCoordsSet.has(`${r}-${c}`) // Is this tile part of the current move?
+                     isPremiumUsed: originalSquare.isPremiumUsed, // Use original premium status
+                     isNew: moveCoordsSet.has(`${currentPosR}-${currentPosC}`)
                  });
-                 if (axis === 'H') c++; else r++;
+                 if (axis === 'H') currentPosC++; else currentPosR++;
              }
 
              // Validate and store if it's a valid word (>1 letter)
              if (currentWord.length > 1) {
-                 if (!dictionary.isValidWord(currentWord)) {
-                     throw new Error(`Invalid word formed: ${currentWord}`); // Throw error
-                 }
-                 // Prevent adding duplicate words based on tiles involved
-                 const wordKey = currentWord + '-' + currentWordTiles.map(t => `${t.r},${t.c}`).join('|');
-                 if (!wordsData.some(wd => wd.key === wordKey)) {
-                     wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
-                 }
+                  if (!dictionary.isValidWord(currentWord)) {
+                      throw new Error(`Invalid word formed: ${currentWord}`); // Throw error
+                  }
+                  // Check if this exact word placement was already added
+                  const wordKey = currentWord + '-' + currentWordTiles.map(t => `${t.r},${t.c}`).join('|');
+                  if (!wordsData.some(wd => wd.key === wordKey)) {
+                       wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
+                  }
              }
          };
 
         try {
-             // Check the main word along the placement axis (start from first tile placed)
-             checkWord(move[0], orientation);
+             // Check the main word along the placement axis
+             if (lineCoords && lineCoords.length > 0) {
+                 checkWord(lineCoords[0], orientation); // Start check from first tile placed in the line
+             } else {
+                  console.error(`GameState Error: lineCoords empty in _findFormedWords for game ${this.gameId}`);
+                  return { valid: false, error: "Internal Error: Could not determine move line." };
+             }
 
              // Check cross words (perpendicular axis) for each tile placed
              const crossAxis = (orientation === 'H') ? 'V' : 'H';
-             // Only check cross words if the main word was > 1 tile OR it was a single tile placement
-             if (orientation === 'single' || (lineCoords && lineCoords.length > 1)) {
-                  for (const tile of move) {
-                       checkWord({ r: tile.row, c: tile.col }, crossAxis);
-                  }
+             // Only check cross words if the main placement forms a line or is single
+             if (orientation === 'single' || (lineCoords && lineCoords.length >= 1)) {
+                 for (const tile of move) {
+                      checkWord({ r: tile.row, c: tile.col }, crossAxis);
+                 }
              }
         } catch (error) {
              console.error(`Word validation error in game ${this.gameId}: ${error.message}`);
              return { valid: false, error: error.message };
         }
 
-        // Final check: A valid move must result in at least one word being added to wordsData
+        // A valid move must result in at least one word being added to wordsData
         if (wordsData.length === 0 && move.length > 0) {
-             console.warn(`GameState ${this.gameId}: Move validly placed but formed no words? Review logic.`);
-             // This might indicate only single letters were added adjacently without forming new words > 1 length
-             // Generally considered invalid.
+             console.warn(`GameState ${this.gameId}: Move by ${playerId} formed no words > 1 letter. Placement might be invalid.`);
              return { valid: false, error: 'Move must form at least one word of length 2 or more.' };
         }
 
@@ -504,38 +509,39 @@ class GameState {
     _calculateScore(move, wordsData) {
         // Calculates score considering premiums and bingo.
         let totalScore = 0;
+
         for (const { word, tiles } of wordsData) {
             let currentWordScore = 0;
             let wordMultiplier = 1;
+
             for (const tile of tiles) {
-                let letterScore = tile.value; // Use value from tile object (0 for blank)
+                // Value comes from the tile object prepared in _findFormedWords,
+                // which should reflect the original tile value (0 for blank)
+                let letterScore = tile.value;
+
                 // Apply premiums only if tile is NEW (part of current move)
-                if (tile.isNew) {
-                    const originalSquare = this.board[tile.r][tile.c]; // Check original board state
-                    // Apply only if premium is fresh (wasn't used before this move)
-                    if (!originalSquare.isPremiumUsed) {
-                        switch (originalSquare.premium) {
-                            case 'DL': letterScore *= 2; break;
-                            case 'TL': letterScore *= 3; break;
-                            case 'DW': wordMultiplier *= 2; break;
-                            case 'TW': wordMultiplier *= 3; break;
-                        }
-                        // Center square counts as DW on first move only
-                        if (originalSquare.isCenter && this.isFirstMove) {
-                            wordMultiplier *= 2;
-                        }
+                // and the premium hasn't been used before on this square
+                if (tile.isNew && !tile.isPremiumUsed) {
+                    switch (tile.premium) {
+                        case 'DL': letterScore *= 2; break;
+                        case 'TL': letterScore *= 3; break;
+                        case 'DW': wordMultiplier *= 2; break;
+                        case 'TW': wordMultiplier *= 3; break;
                     }
                 }
                  currentWordScore += letterScore;
              }
              totalScore += (currentWordScore * wordMultiplier);
         }
+
+        // Add Bingo bonus if all 7 tiles were used
         let bingoBonus = 0;
         if (move.length === RACK_SIZE) {
             bingoBonus = 50;
             totalScore += bingoBonus;
             console.log(`GameState ${this.gameId}: Bingo! +50 points.`);
         }
+
         return { score: totalScore, bingoBonus };
     }
 
@@ -552,7 +558,7 @@ class GameState {
     _endGame(reason) {
          if (this.status === 'finished') return; // Prevent ending twice
          this.status = 'finished';
-         console.log(`GameState ${this.gameId}: Game finished. Reason: ${reason}`);
+         console.log(`GameState [${this.gameId}]: Game finished. Reason: ${reason}`);
          let scoreSumOfRacks = 0; let playerWhoFinished = null;
 
          if (reason === 'tiles') { // Player finished by using last tile
@@ -565,14 +571,14 @@ class GameState {
              if (player.rack.length > 0) {
                  player.score -= rackValue; // Subtract remaining tile values from own score
                  scoreSumOfRacks += rackValue; // Add to sum for the player who finished (if applicable)
-                 console.log(`GameState ${this.gameId}: Player ${player.username} loses ${rackValue} points for remaining tiles.`);
+                 console.log(`GameState [${this.gameId}]: Player ${player.username} loses ${rackValue} points for remaining tiles.`);
              }
          }
 
          // Add sum to player who finished, if game ended by tiles
          if (playerWhoFinished) {
              playerWhoFinished.score += scoreSumOfRacks;
-             console.log(`GameState ${this.gameId}: Player ${playerWhoFinished.username} gains ${scoreSumOfRacks} points for finishing.`);
+             console.log(`GameState [${this.gameId}]: Player ${playerWhoFinished.username} gains ${scoreSumOfRacks} points for finishing.`);
          }
 
          // Store final calculated scores, sorted descending
@@ -582,7 +588,7 @@ class GameState {
              finalScore: p.score // The final, adjusted score
          })).sort((a, b) => b.finalScore - a.finalScore);
 
-         console.log(`GameState ${this.gameId}: Final scores calculated:`, JSON.stringify(this.finalScores));
+         console.log(`GameState [${this.gameId}]: Final scores calculated:`, JSON.stringify(this.finalScores));
          // Ensure no player has the turn anymore
          this.players.forEach(p => p.isTurn = false);
          this.currentTurnIndex = -1; // No current turn
@@ -601,9 +607,9 @@ class GameState {
                 rackTileCount: p.rack.length, // Don't send actual tiles
                 isTurn: p.isTurn
             })),
-            board: this.board, // Send full board state (tiles, premiums, used status)
+            board: this.board, // Send full board state
             tilesRemaining: this.tileBag.length,
-            currentTurnPlayerId: this.currentTurnIndex >= 0 && this.players[this.currentTurnIndex] ? this.players[this.currentTurnIndex].id : null,
+            currentTurnPlayerId: (this.currentTurnIndex >= 0 && this.players[this.currentTurnIndex]) ? this.players[this.currentTurnIndex].id : null,
             status: this.status,
             lastMove: this.lastMove, // Include details of the last move for display
             consecutivePasses: this.consecutivePasses,
@@ -621,19 +627,6 @@ class GameState {
             myRack: player ? [...(player.rack || [])] : []
         };
     }
-} // End of GameState Class
-
-// Helper for connectivity check (could be moved to gameLogic)
-function isConnected(board, r, c) {
-     const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-     for (const [dr, dc] of neighbors) {
-         const nr = r + dr; const nc = c + dc;
-         if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr]?.[nc]?.tile !== null) {
-             return true;
-         }
-     }
-     return false;
- }
-
-
+} 
+// End of GameState Class
 module.exports = GameState;

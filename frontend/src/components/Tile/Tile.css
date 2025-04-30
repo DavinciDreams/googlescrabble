@@ -2,74 +2,67 @@
 
 /* Base Tile Styling */
 .tile {
-    /* Use CSS variable defined in App.css or define here */
-    --tile-size: 45px;
-    width: var(--tile-size);
-    height: var(--tile-size);
-    background-color: #f5eec6; /* Classic beige tile color */
-    border: 1px solid #bdae8c; /* Darker beige border */
-    border-radius: 5px;
-    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2), /* Drop shadow */
-                inset 1px 1px 1px rgba(255, 255, 255, 0.5); /* Subtle inner highlight */
-    display: flex;
-    flex-direction: column; /* Stack letter and value */
-    align-items: center;
-    justify-content: center; /* Center content */
-    position: relative; /* For absolute positioning of value */
-    font-family: Arial, Helvetica, sans-serif; /* Or a preferred Scrabble-like font */
-    font-weight: bold;
-    user-select: none; /* Prevent text selection during drag attempts */
-    box-sizing: border-box; /* Include border/padding in size */
-    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, opacity 0.1s ease-out; /* Smooth transitions */
-  }
-  
-  /* Draggable state */
-  .tile.draggable {
-    cursor: grab; /* Indicate it can be picked up */
-  }
-  .tile.draggable:active {
-    cursor: grabbing; /* Indicate it's being held */
-  }
-  
-  /* Tile Letter */
-  .tile-letter {
-    font-size: calc(var(--tile-size) * 0.6); /* Scale letter size relative to tile */
-    color: #333; /* Dark letter color */
-    line-height: 1; /* Adjust for vertical centering */
-    margin-bottom: -3px; /* Fine-tune positioning if needed */
-    text-transform: uppercase; /* Ensure letter is uppercase */
-  }
-  
-  /* Tile Value */
-  .tile-value {
-    font-size: calc(var(--tile-size) * 0.25); /* Scale value size */
-    font-weight: normal; /* Lighter weight for value */
-    position: absolute;
-    bottom: 2px;
-    right: 4px;
-    color: #555; /* Dark grey value color */
-  }
-  
-  /* Blank Tile Specific Styles */
-  .tile.blank-tile {
-    background-color: #e4d9c0; /* Slightly different background for blank */
-  }
-  .tile.blank-tile .tile-letter {
-    /* Optional: Style the space where the letter would be if needed */
-  }
-  
-  /* Style for when a tile is being actively dragged */
-  .tile.dragging {
-    opacity: 0.5; /* Make it semi-transparent */
-    transform: scale(1.08); /* Slightly larger */
-    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3); /* Larger shadow */
-    z-index: 1000; /* Ensure it appears above other elements */
-  }
-  
-  /* Style for tiles selected for exchange */
-  .tile.tile-selected-exchange {
-    /* Use a border or background change */
-    box-shadow: 0 0 0 3px rgba(75, 181, 67, 0.7); /* Green glow/border */
-    /* Or slightly change background: */
-    /* background-color: #dff0d8; */
-  }
+  /* Use variable for size consistency */
+  width: var(--tile-size, 45px);
+  height: var(--tile-size, 45px);
+  background-color: var(--tile-bg); /* Use variable */
+  border: 2px solid var(--tile-border); /* Use variable */
+  border-radius: 3px; /* Slightly sharp corners */
+  /* Comic book style offset shadow */
+  box-shadow: 2px 2px 0px var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-family: var(--tile-letter-font); /* Use variable */
+  font-weight: normal; /* Font might be bold */
+  user-select: none;
+  box-sizing: border-box;
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, opacity 0.1s ease-out;
+}
+
+/* Draggable state styling */
+.tile.draggable { cursor: grab; }
+.tile.draggable:active { cursor: grabbing; }
+
+/* Tile Letter styling */
+.tile-letter {
+  font-size: calc(var(--tile-size, 45px) * 0.65); /* Prominent letter */
+  color: var(--tile-letter-color); /* Use variable */
+  line-height: 1;
+  margin-bottom: -3px; /* Adjust vertical position */
+  text-transform: uppercase;
+}
+
+/* Tile Value styling */
+.tile-value {
+  font-size: calc(var(--tile-size, 45px) * 0.28);
+  font-family: sans-serif; /* Simple font for value */
+  font-weight: bold;
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  color: var(--tile-letter-color); /* Match letter color */
+}
+
+/* Blank Tile specific style */
+.tile.blank-tile {
+  background-color: #e8e0c4; /* Slightly different bg */
+}
+
+/* Style for when a tile is being actively dragged */
+.tile.dragging {
+  opacity: 0.7;
+  transform: scale(1.08) rotate(3deg); /* Scale up and tilt */
+  box-shadow: 4px 4px 0px var(--border-color), 6px 6px 10px rgba(0,0,0,0.3); /* Enhance shadow */
+  z-index: 1000; /* Ensure it's on top */
+  cursor: grabbing;
+}
+
+/* Style for tiles selected for exchange */
+.tile.tile-selected-exchange {
+  /* Add a noticeable outline */
+  outline: var(--border-thickness, 3px) dashed var(--tile-selected-outline, #e74c3c);
+  outline-offset: -3px; /* Inset the outline slightly */
+}

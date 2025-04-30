@@ -1,0 +1,51 @@
+/* In Square.css or Board.css */
+
+/* Ensure existing premium background colors are defined */
+.square.triple-word { background-color: #ff6a6a; color: white; } /* Red */
+.square.double-word { background-color: #ffb6c1; color: #5b3a3e;} /* Pink */
+.square.triple-letter { background-color: #4169e1; color: white; } /* Blue */
+.square.double-letter { background-color: #add8e6; color: #2a4d69;} /* Light Blue */
+.square.center-square { background-color: #ffb6c1; } /* Default center to DW color */
+
+/* Styles for the premium text label */
+.premium-text {
+    position: absolute; /* Position within the square */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--square-size, 40px) * 0.2); /* Smaller font size */
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.1;
+    padding: 2px; /* Small padding */
+    box-sizing: border-box;
+    pointer-events: none; /* Don't interfere with drag/drop */
+    user-select: none;
+    text-transform: uppercase;
+    /* Text color is inherited from parent .square class by default */
+    /* Override if needed: e.g., color: rgba(0,0,0,0.7); */
+}
+
+/* Styles for the center star */
+.center-star {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: calc(var(--square-size, 40px) * 0.6); /* Adjust size */
+    color: #ddaa00; /* Gold-ish star */
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.8; /* Make it slightly transparent */
+}
+
+/* Style for squares being dragged over (optional visual feedback) */
+.square.drag-over {
+    outline: 3px dashed rgba(0, 128, 0, 0.7);
+    outline-offset: -3px;
+    background-color: #e0ffe0; /* Light green tint */
+}

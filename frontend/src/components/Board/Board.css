@@ -1,18 +1,22 @@
-/* Basic Board Styling */
+/* frontend/src/components/Board/Board.css */
+
 .scrabble-board {
     display: grid;
-    /* Create a 15x15 grid */
+    /* Use variable defined in index.css */
     grid-template-columns: repeat(15, var(--square-size, 40px));
     grid-template-rows: repeat(15, var(--square-size, 40px));
-    border: 2px solid #333;
-    width: calc(15 * var(--square-size, 40px)); /* Adjust width based on square size */
+    border: var(--border-thickness, 3px) solid var(--border-color, #000);
     margin: 20px auto; /* Center the board */
-    background-color: #c5bca0; /* Classic board-like background */
+    /* Use a neutral background, squares provide color */
+    background-color: #ccc;
+    /* Gap creates grid lines */
+    gap: 1px;
+    /* Padding ensures gap acts like border */
+    padding: 1px;
 }
 
 .board-row {
-    /* Rows are implicitly handled by the grid */
-    display: contents; /* Important for grid layout */
+    display: contents; /* Let squares flow directly into the grid */
 }
 
 .board-loading {
@@ -20,53 +24,80 @@
     text-align: center;
     font-style: italic;
     color: #555;
+    font-family: var(--body-font);
 }
 
-/* --- Square Styling (can also be in Square.css) --- */
+/* --- Square Styling --- */
 .square {
-    border: 1px solid #ccc;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative; /* For positioning premium text or tiles */
-    background-color: #e4d9c0; /* Default square color */
-    font-size: 10px; /* For premium text */
-    color: rgba(0, 0, 0, 0.7);
-    text-align: center;
-    user-select: none; /* Prevent text selection */
-    box-sizing: border-box; /* Include padding/border in element's total width/height */
+    position: relative;
+    /* Default square background */
+    background-color: var(--bg-color);
+    box-sizing: border-box;
+    user-select: none;
 }
 
 .square.occupied {
-   /* Style for squares with tiles */
-   /* Usually the tile itself provides the look */
+   /* Style for squares with tiles, usually tile provides look */
+}
+.square.empty {
+    /* Style for empty squares if needed */
 }
 
-/* Premium Square Colors */
-.square.triple-word { background-color: #ff6a6a; color: white; } /* Red */
-.square.double-word { background-color: #ffb6c1; color: #5b3a3e;} /* Pink */
-.square.triple-letter { background-color: #4169e1; color: white; } /* Blue */
-.square.double-letter { background-color: #add8e6; color: #2a4d69;} /* Light Blue */
+/* Premium Square Colors - Use CSS Variables */
+.square.triple-word { background-color: var(--tw-color); color: var(--premium-text-light); }
+.square.double-word { background-color: var(--dw-color); color: var(--premium-text-dark); }
+.square.triple-letter { background-color: var(--tl-color); color: var(--premium-text-light); }
+.square.double-letter { background-color: var(--dl-color); color: var(--premium-text-dark); }
+.square.center-square { background-color: var(--center-color); color: var(--premium-text-dark); }
 
-/* Center Square (often DW color or special marker) */
-.square.center-square {
-    background-color: #ffb6c1; /* Default to DW */
-    position: relative;
+/* Premium text label */
+.premium-text {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Smaller font, adjust multiplier as needed */
+    font-size: calc(var(--square-size, 40px) * 0.18);
+    /* Simple readable font for premiums */
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.0; /* Tight line height */
+    padding: 1px;
+    box-sizing: border-box;
+    pointer-events: none;
+    text-transform: uppercase;
+    opacity: 0.9; /* Slightly faded */
+    /* Text color is inherited from parent .square */
+    /* Ensure good contrast against background colors */
 }
 
+/* Center star styling */
 .center-star {
     position: absolute;
-    font-size: calc(var(--square-size, 40px) * 0.6); /* Adjust size relative to square */
-    color: #ffcc00; /* Gold star */
-    pointer-events: none; /* Don't interfere with drop events */
-    opacity: 0.8;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: calc(var(--square-size, 40px) * 0.7); /* Prominent star */
+    color: var(--base-text-color); /* Black star */
+    opacity: 0.7;
+    pointer-events: none;
+    user-select: none;
 }
 
+/* Visual feedback for dragging over a square */
+.square.drag-over {
+    outline: 3px dashed rgba(0, 0, 0, 0.8); /* Dashed black outline */
+    outline-offset: -3px;
+    /* Optional: Slightly change background */
+    /* background-color: #e0e0e0; */
+}
 
-/* Premium text styling */
-.premium-text {
-    display: block; /* Make span take up space */
-    line-height: 1.1;
-    font-weight: bold;
-    pointer-events: none; /* Don't interfere with drop events */
+/* Style for temporary tiles placed on board */
+.square.temporary .tile {
+     opacity: 0.75; /* Make temp tiles slightly faded */
+     border-style: dashed; /* Dashed border for temp tiles */
 }

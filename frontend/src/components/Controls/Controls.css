@@ -1,0 +1,38 @@
+/* frontend/src/components/Controls/Controls.css */
+
+.game-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+    gap: 10px; /* Space between buttons */
+    margin-top: 20px;
+    padding: 10px;
+    width: 100%; /* Take full width of main panel */
+    box-sizing: border-box;
+}
+
+/* Optional: Style specific buttons differently */
+.game-controls button:nth-of-type(1) { /* Play Word */
+    background-color: var(--button-action-bg);
+    color: white;
+}
+.game-controls button:nth-of-type(1):hover:not(:disabled) {
+    background-color: var(--button-action-hover-bg);
+}
+
+.game-controls button:nth-of-type(2) { /* Pass Turn */
+    background-color: var(--button-pass-bg);
+    color: var(--base-text-color);
+}
+.game-controls button:nth-of-type(2):hover:not(:disabled) {
+    background-color: var(--button-pass-hover-bg);
+}
+
+.game-controls button:nth-of-type(3) { /* Exchange Tiles */
+    background-color: var(--button-secondary-bg);
+    color: white;
+}
+.game-controls button:nth-of-type(3):hover:not(:disabled) {
+    background-color: var(--button-secondary-hover-bg);
+}

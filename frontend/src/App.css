@@ -1,172 +1,164 @@
-/* Basic Reset & Body Styles */
-body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color: #f0f0f0; /* Light grey background for the page */
-    color: #333;
-  }
-  
-  code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-      monospace;
-  }
-  
-  /* CSS Variables */
-  :root {
-    --tile-size: 45px; /* Size for tiles in the rack */
-    --square-size: 40px; /* Size for squares on the board */
-  }
-  
-  
-  /* Main App Container */
-  .App {
+/* frontend/src/App.css */
+
+.App {
+  padding: 15px;
+  max-width: 1300px; /* Max width for content */
+  margin: 0 auto; /* Center content */
+  text-align: center; /* Center inline elements like join form container */
+}
+
+.App h1 {
+  font-size: 3.5em; /* Large main title */
+  margin-bottom: 20px;
+  text-align: center;
+  color: #000; /* Black title */
+  /* Retro shadow effect */
+  text-shadow: 3px 3px 0px #ccc, 5px 5px 0px rgba(0,0,0,0.2);
+}
+
+/* Connection Status */
+.App > p:first-of-type { /* Target the first <p> tag directly under App */
+  text-align: center;
+  font-style: normal; /* Override italic potentially */
+  margin-bottom: 20px;
+  font-size: 1.1em;
+  font-weight: bold; /* Make status slightly bolder */
+}
+
+/* Join Form Container Styling */
+.join-form-container {
+  padding: 25px 30px;
+  background-color: var(--panel-bg);
+  border: var(--border-thickness) solid var(--border-color);
+  display: inline-block; /* Center the block */
+  margin-bottom: 30px;
+  margin-top: 10px;
+  /* Optional: Halftone dot pattern background */
+  /* background-image: url('/images/halftone-dots.png'); */
+  /* background-repeat: repeat; */
+}
+
+.join-form .form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.join-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  font-size: 1em; /* Use body font size */
+  font-family: var(--body-font); /* Ensure correct font */
+  color: var(--base-text-color);
+}
+
+.join-form input[type="text"] {
+  width: 250px; /* Fixed width or adjust as needed */
+  padding: 8px 10px;
+  border: 2px solid var(--border-color); /* Match button border */
+  font-size: 1.1em; /* Slightly larger input text */
+  font-family: var(--body-font);
+  background-color: #fff; /* White background */
+}
+
+.join-form button[type="submit"] {
+  margin-top: 10px;
+  display: block; /* Make button full width */
+  width: 100%;
+  background-color: var(--button-action-bg); /* Use action color */
+  color: white;
+}
+.join-form button[type="submit"]:hover:not(:disabled) {
+  background-color: var(--button-action-hover-bg);
+}
+
+.error-message.join-error {
+  margin-top: 15px;
+  text-align: center;
+}
+
+
+/* Game Area Layout */
+.game-area {
+  display: flex;
+  flex-wrap: wrap; /* Allow panels to wrap on smaller screens */
+  justify-content: center; /* Center panels */
+  gap: 25px; /* Space between panels */
+  margin-top: 20px;
+}
+
+/* Panel Styling */
+.left-panel, .main-panel {
+  border: var(--border-thickness) solid var(--border-color);
+  background-color: var(--panel-bg);
+  padding: 15px;
+  box-sizing: border-box;
+  /* Optional Halftone background for panels */
+  /* background-image: url('/images/halftone-light.png'); */
+  /* background-repeat: repeat; */
+  /* background-size: 100px; */
+}
+
+.left-panel {
+  flex: 1; /* Takes up roughly 1 part of space */
+  min-width: 240px; /* Minimum width before wrapping */
+  max-width: 300px; /* Maximum width */
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Space between components in the left panel */
+}
+
+.main-panel {
+  flex: 3; /* Takes up roughly 3 parts of space */
+  /* Ensure min-width accounts for board size, padding, border */
+  min-width: calc(15 * var(--square-size, 40px) + 2 * var(--border-thickness) + 30px);
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center board, rack, controls horizontally */
+}
+
+/* Headings within panels */
+.left-panel h2, .left-panel h3, .left-panel h4 {
+  margin-top: 0;
+  font-size: 1.8em;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+  text-align: center;
+  color: var(--base-text-color);
+}
+
+/* Share Game Section */
+.share-game-section {
+  border: 2px dashed var(--border-color);
+  background-color: rgba(255,255,150,0.15); /* Faint yellow */
+  padding: 10px 15px;
+  margin-bottom: 15px;
+}
+.share-game-section h4 { font-size: 1.3em; border-bottom: none; margin-bottom: 5px; }
+.share-game-section p { margin-bottom: 5px; font-size: 1em; } /* Use body font size */
+
+.game-id-display {
+  display: flex; align-items: center; gap: 10px;
+  background-color: #fff; padding: 5px 8px;
+  border: 2px solid var(--border-color); margin-bottom: 5px;
+}
+.game-id-display code { font-family: monospace; font-size: 1.2em; color: #d63384; font-weight: bold; flex-grow: 1; background: none; padding: 0; } /* Remove code bg */
+.game-id-display button { padding: 3px 8px; font-size: 0.8em; margin: 0; box-shadow: none; border-width: 2px; background-color: var(--button-secondary-bg); color: white; }
+.game-id-display button:hover:not(:disabled) { background-color: var(--button-secondary-hover-bg); }
+.copy-feedback { display: block; margin-top: 5px; font-size: 0.9em; color: green; font-style: normal; text-align: center; font-weight: bold;}
+
+/* Loading Text Style */
+.App > p:last-of-type { /* Target loading text */
+    font-size: 1.5em;
+    font-family: var(--headline-font);
+    margin-top: 30px;
+    color: #555;
+}
+
+/* General error message styling (also used for lastGameError) */
+.error-message {
+    padding: 8px;
+    margin: 10px 0;
     text-align: center;
-    padding: 15px;
-  }
-  
-  .App h1 {
-    color: #2c3e50; /* Dark blue-grey heading */
-    margin-bottom: 10px;
-  }
-  
-  /* Connection Status */
-  .App p {
-    margin-bottom: 15px;
-    font-style: italic;
-    color: #666;
-  }
-  
-  /* Join Game Form */
-  .App form {
-    margin-bottom: 20px;
-    padding: 15px;
-    background-color: #fff;
-    border-radius: 5px;
-    display: inline-block;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .App form input[type="text"] {
-    padding: 8px 10px;
-    margin-right: 10px;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    font-size: 1em;
-  }
-  
-  .App form button {
-    padding: 8px 15px;
-    font-size: 1em;
-    cursor: pointer;
-    background-color: #4CAF50; /* Green */
-    color: white;
-    border: none;
-    border-radius: 3px;
-    transition: background-color 0.2s ease;
-  }
-  
-  .App form button:hover {
-    background-color: #45a049;
-  }
-  
-  
-  /* Game Area Layout */
-  .game-area {
-    display: flex;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    justify-content: center; /* Center items if they wrap */
-    gap: 20px; /* Space between left and main panels */
-    margin-top: 20px;
-    max-width: 1200px; /* Max width for the game area */
-    margin-left: auto;
-    margin-right: auto;
-  }
-  
-  .left-panel {
-    flex: 1; /* Takes up available space */
-    min-width: 200px; /* Minimum width before wrapping */
-    max-width: 250px; /* Maximum width */
-    display: flex;
-    flex-direction: column;
-    gap: 15px; /* Space between components in the left panel */
-    padding: 10px;
-    background-color: #ffffff;
-    border-radius: 5px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  
-  .main-panel {
-    flex: 3; /* Takes up more space */
-    min-width: calc(15 * var(--square-size) + 40px); /* Ensure enough space for board + padding */
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* Center board, rack, controls vertically */
-    padding: 10px;
-    /* background-color: #f9f9f9; Optional background */
-    border-radius: 5px;
-    /* box-shadow: 0 1px 3px rgba(0,0,0,0.1); Optional shadow */
-  }
-  
-  /* General Button Styling (can be refined in specific components) */
-  button {
-    padding: 10px 15px;
-    margin: 5px;
-    font-size: 1em;
-    cursor: pointer;
-    border-radius: 4px;
-    border: 1px solid transparent;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-  }
-  
-  button:disabled {
-    background-color: #ccc !important;
-    color: #666 !important;
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-  
-  /* Add styles for specific components within panels if needed */
-  .left-panel > div { /* Style direct children divs (Scoreboard, GameInfo, Chat) */
-    border: 1px solid #eee;
-    border-radius: 4px;
-    padding: 10px;
-    background-color: #fdfdfd;
-  }
-  
-  .left-panel h2 {
-    margin-top: 0;
-    font-size: 1.2em;
-    color: #34495e; /* Slightly muted blue */
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-    margin-bottom: 10px;
-  }
-  
-  
-  /* Responsive Adjustments (Example) */
-  @media (max-width: 768px) {
-    .game-area {
-      flex-direction: column; /* Stack panels vertically */
-      align-items: center; /* Center panels */
-    }
-  
-    .left-panel {
-      max-width: 90%; /* Allow left panel to take more width */
-      order: 2; /* Move left panel below main panel */
-    }
-  
-    .main-panel {
-       max-width: 95%; /* Allow main panel to take more width */
-       order: 1; /* Keep main panel (board/rack) on top */
-    }
-  
-     :root {
-       /* Slightly smaller tiles/squares on mobile */
-       --tile-size: 40px;
-       --square-size: 35px;
-     }
-  }
+}

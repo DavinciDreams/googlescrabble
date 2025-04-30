@@ -1,86 +1,82 @@
 /* frontend/src/components/Rack/Rack.css */
 
 .player-rack {
-    background-color: #8b4513; /* Wood-like color */
-    padding: 10px 15px; /* More padding horizontally */
-    border-radius: 8px;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4); /* Deeper inset shadow */
-    margin-top: 20px;
-    margin-bottom: 20px;
+    background-color: #773d1c; /* Darker wood color */
+    padding: 10px 15px;
+    border-radius: 0; /* Sharp corners */
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5); /* Deeper inset shadow */
+    margin-top: 25px; /* More space */
+    margin-bottom: 25px;
     text-align: center;
-    border: 2px solid #5a2d0c; /* Darker wood border */
-    min-height: calc(var(--tile-size, 45px) + 24px); /* Ensure height based on tile size + padding */
-    transition: background-color 0.2s ease; /* For drag over effect */
+    border: var(--border-thickness, 3px) solid var(--border-color, #000);
+    min-height: calc(var(--tile-size, 45px) + 24px);
+    transition: background-color 0.2s ease;
 }
 
-/* Visual feedback when dragging over the rack area */
+/* Visual feedback for dragging over the rack area */
 .player-rack.drag-over {
-    background-color: #a0522d; /* Slightly lighter brown */
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6);
+    background-color: #8b4513; /* Lighter brown */
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7);
 }
 
 .player-rack h3 {
-    color: #f0e68c; /* Khaki/Light gold */
+    color: #f8f0c5; /* Lighter text color */
     margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1.1em;
-    font-weight: bold;
-    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5); /* Subtle text shadow */
+    margin-bottom: 15px; /* More space below heading */
+    font-size: 1.6em; /* Use headline font size */
+    font-family: var(--headline-font);
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.6);
 }
 
 .rack-tiles {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 6px; /* Space between tiles/slots */
+    gap: 8px; /* Slightly more space between slots */
 }
 
 .rack-slot {
-    /* Make slot slightly larger than tile for visual spacing */
     width: calc(var(--tile-size, 45px) + 4px);
     height: calc(var(--tile-size, 45px) + 4px);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 5px; /* Rounded corners for slots */
-    transition: background-color 0.2s ease, border 0.2s ease; /* Smooth transitions */
+    border-radius: 3px; /* Slight rounding for slots */
+    transition: background-color 0.2s ease, border 0.2s ease;
+    border: 1px solid transparent; /* Placeholder border for transitions */
 }
 
-/* Style for empty slots (placeholders or when tile is on board) */
+/* Style for empty slots */
 .empty-slot {
-    width: calc(var(--tile-size, 45px) - 2px); /* Slightly smaller than tile */
+    width: calc(var(--tile-size, 45px) - 2px);
     height: calc(var(--tile-size, 45px) - 2px);
-    background-color: rgba(0, 0, 0, 0.25); /* Darker indentation */
-    border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.1); /* Faint border */
+    background-color: rgba(0, 0, 0, 0.3); /* Darker indent */
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Style when a tile temporarily placed on board occupies this slot */
+/* Indicate slots with tiles temporarily on board */
 .rack-slot.slot-occupied-temp .empty-slot {
-    background-color: rgba(200, 200, 200, 0.1); /* Very faint indication */
+    background-color: rgba(200, 200, 200, 0.1);
     border-style: dashed;
 }
 
-/* Style for slots whose tile is selected for exchange */
+/* Indicate slots whose tile is selected for exchange */
 .rack-slot.slot-selected-exchange {
-    background-color: rgba(75, 181, 67, 0.3); /* Light green semi-transparent */
-    border: 1px dashed #4CAF50; /* Green dashed border */
+    background-color: rgba(231, 76, 60, 0.2); /* Use red for selection now */
+    border: 1px dashed var(--tile-selected-outline, #e74c3c);
 }
 
-/* Indicate that tiles in selectable slots can be clicked */
+/* Indicate selectable tiles */
 .rack-slot.selectable {
-    cursor: pointer; /* Hand cursor */
+    cursor: pointer;
 }
 
-/* Adjust tile positioning within the slot slightly if needed */
+.rack-slot.selectable:hover {
+    background-color: rgba(255, 255, 255, 0.05); /* Subtle hover */
+}
+
+/* Ensure tile sits centered */
 .rack-slot .tile {
-   /* Example: Slightly adjust margin if tile looks off-center */
-   /* margin: 1px; */
+   /* Usually centered by flex, no extra margin needed */
 }
-
-/* Add styles for the tile-selected-exchange class if not already in Tile.css */
-/* This could be a border, background change, or opacity adjustment */
-/* .tile.tile-selected-exchange { */
-    /* border: 2px solid #4CAF50; */
-    /* opacity: 0.7; */
-/* } */

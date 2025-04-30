@@ -1,0 +1,120 @@
+/* frontend/src/index.css */
+
+/* Import Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Special+Elite&display=swap');
+
+/* CSS Variables */
+:root {
+  --headline-font: 'Bangers', cursive;
+  --body-font: 'Special Elite', monospace;
+  --base-text-color: #222;
+  --bg-color: #fdfcf6; /* Creamy off-white */
+  --panel-bg: #f0f0f0; /* Slightly darker grey/off-white for panels */
+  --border-color: #000;
+  --border-thickness: 3px; /* Chunky border */
+
+  /* Premium Square Colors (Adjusted for retro feel) */
+  --dl-color: #a7d8e6; /* Lighter blue */
+  --tl-color: #5c8bd1; /* Faded blue */
+  --dw-color: #f7b8c1; /* Faded pink */
+  --tw-color: #e96a6a; /* Faded red */
+  --center-color: var(--dw-color); /* Center matches DW */
+  --premium-text-dark: #444; /* Text color for light premiums */
+  --premium-text-light: #fff; /* Text color for dark premiums */
+
+  --tile-bg: #fffada; /* Creamier tile background */
+  --tile-border: #a09880; /* Tile border color */
+  --tile-letter-font: var(--body-font); /* Newsprint/typewriter style for letters */
+  --tile-letter-color: #111; /* Dark tile letter */
+  --tile-selected-outline: #e74c3c; /* Reddish outline for selected tile */
+
+  /* Button colors */
+  --button-bg: #e7e7e7;
+  --button-hover-bg: #d7d7d7;
+  --button-action-bg: #5cb85c; /* Green for Play/Action */
+  --button-action-hover-bg: #4cae4c;
+  --button-secondary-bg: #5bc0de; /* Blue for Info/Copy? */
+  --button-secondary-hover-bg: #46b8da;
+  --button-pass-bg: #f0ad4e; /* Yellow/Orange for Pass */
+  --button-pass-hover-bg: #ec971f;
+
+  /* Defined square and tile size */
+  --square-size: 40px;
+  --tile-size: 45px;
+}
+
+/* Basic Reset & Body Styles */
+body {
+  margin: 0;
+  font-family: var(--body-font); /* Set default body font */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-color);
+  color: var(--base-text-color);
+  /* Optional: Add subtle newsprint texture */
+  /* background-image: url('/images/newsprint-texture.png'); */
+  /* background-repeat: repeat; */
+  /* background-size: 300px; */ /* Adjust size */
+}
+
+/* Default headings use headline font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--headline-font);
+  letter-spacing: 1px;
+  color: var(--base-text-color);
+  font-weight: normal; /* Bangers font is already bold */
+}
+
+/* Basic button styling */
+button {
+    font-family: var(--headline-font); /* Buttons use comic font */
+    border: var(--border-thickness) solid var(--border-color);
+    background-color: var(--button-bg);
+    color: var(--base-text-color);
+    padding: 8px 18px;
+    border-radius: 0; /* Sharp corners */
+    box-shadow: 2px 2px 0px var(--border-color); /* Simple offset shadow */
+    cursor: pointer;
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.1s ease-out;
+    margin: 5px;
+    text-transform: uppercase; /* Comic style buttons often uppercase */
+    font-size: 1em;
+}
+
+button:hover:not(:disabled) {
+    background-color: var(--button-hover-bg);
+}
+/* Simulate button press */
+button:active:not(:disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0px var(--border-color);
+}
+
+button:disabled {
+  background-color: #ccc !important; /* Use important to override specific styles */
+  color: #777 !important;
+  border-color: #aaa; /* Faded border */
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* General error message style */
+.error-message {
+    color: #c00;
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-top: 10px;
+    padding: 5px;
+    background-color: rgba(255, 0, 0, 0.05);
+    border: 1px dashed #c00;
+}
+
+/* General code style */
+code {
+  font-family: monospace;
+  background-color: rgba(0,0,0,0.05);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 1.1em;
+}

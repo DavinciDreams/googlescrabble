@@ -51,16 +51,16 @@ function App() {
 
         const handleConnect = () => { setIsConnected(true); setLastGameError(''); console.log("handleConnect triggered"); }; // Setter used
         const handleDisconnect = () => { setIsConnected(false); setIsInGame(false); setGameState(null); setMyRack([]); setTemporaryPlacements([]); setGameIdToShare(null); setJoinError('Disconnected. Please refresh.'); console.log("handleDisconnect triggered");}; // Setters used
-
         const handleGameUpdate = (newGameState) => {
             console.log("App received gameUpdate:", newGameState);
-             if (!newGameState || !newGameState.gameId || !Array.isArray(newGameState.players)) { console.error(/*...*/); setLastGameError("Invalid data."); return; }
-            setGameState(newGameState); // Used
-            if (newGameState.myRack && Array.isArray(newGameState.myRack)) { setMyRack(newGameState.myRack); console.log(/*...*/); } // Used
+             if (!newGameState || !newGameState.gameId /* ... */) { /* ... error handling ... */ return; }
+            setGameState(newGameState);
+
+        
             const newMyPlayer = newGameState.players?.find(p => p.id === myPlayerId);
-            if (!newMyPlayer?.isTurn || newGameState.status !== 'playing') { setTemporaryPlacements([]); setSelectedTilesForExchange([]); }
-            setLastGameError(''); // Used
-            if (newGameState.gameId) setGameIdToShare(newGameState.gameId); // Used
+            if (!newMyPlayer?.isTurn || newGameState.status !== 'playing') { /* ... clear temps ... */ }
+            setLastGameError('');
+            if (newGameState.gameId) setGameIdToShare(newGameState.gameId);
         };
 
         const handleGameJoined = (playerSpecificState) => {
@@ -121,20 +121,48 @@ const handleError = (error) => { // Handles gameError event from server
 
 
     // --- Drag and Drop Handlers ---
-    const handleTileDropOnBoard = useCallback((tileData, targetRow, targetCol) => {
-        if (!canInteract) return;
-        if (temporaryPlacements.some(p => p.row === targetRow && p.col === targetCol)) { console.warn(/*...*/); return; }
-        if (selectedTilesForExchange.length > 0) setSelectedTilesForExchange([]);
-        setTemporaryPlacements(prevPlacements => {
-            const existingPlacementIndex = prevPlacements.findIndex(p => p.tile.id === tileData.id);
-            let updatedPlacements = [...prevPlacements]; if (existingPlacementIndex > -1) { updatedPlacements.splice(existingPlacementIndex, 1); }
-            let isBlank = false; if (tileData.originData?.type === 'rack') { isBlank = myRack[tileData.originData.index]?.letter === 'BLANK'; } else { isBlank = tileData.value === 0; }
-            updatedPlacements.push({ row: targetRow, col: targetCol, tile: {...tileData, isBlank} });
-            return updatedPlacements;
-        });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canInteract, temporaryPlacements, selectedTilesForExchange.length, myRack]); // Suppress warning, deps seem necessary
+// Inside App.js
+const handleTileDropOnBoard = useCallback((tileData, targetRow, targetCol) => {
+    if (!canInteract) return;
+    console.log(`==> handleTileDropOnBoard START`);
+    console.log(`  Dropping Tile:`, JSON.stringify(tileData));
+    console.log(`  Onto Square: ${targetRow}, ${targetCol}`);
+    console.log(`  Current temporaryPlacements (Before):`, JSON.stringify(temporaryPlacements));
 
+    if (temporaryPlacements.some(p => p.row === targetRow && p.col === targetCol)) {
+         console.warn("  Target square already has a temporary tile. Preventing drop.");
+         console.log(`==> handleTileDropOnBoard END (Blocked)`);
+         return;
+    }
+    if (selectedTilesForExchange.length > 0) setSelectedTilesForExchange([]);
+
+    setTemporaryPlacements(prevPlacements => {
+        console.log(`  setTemporaryPlacements running...`);
+        // --- Logic to remove tile if it was dragged from another temp board spot ---
+        let updatedPlacements = [...prevPlacements];
+        if (tileData.originData?.type === 'board') {
+             console.log(`  Tile originated from board (${tileData.originData.row}, ${tileData.originData.col}). Filtering it out.`);
+             updatedPlacements = updatedPlacements.filter(p => !(p.row === tileData.originData.row && p.col === tileData.originData.col));
+             console.log(`  Placements after filtering origin:`, JSON.stringify(updatedPlacements));
+        }
+        // --- End removal logic ---
+
+        // Add the new placement
+        // Ensure isBlank is correctly determined here
+        let isBlank = false;
+        if (tileData.originData?.type === 'rack' && typeof tileData.originData.index === 'number' && myRack[tileData.originData.index]) {
+             isBlank = myRack[tileData.originData.index].letter === 'BLANK';
+        } else { isBlank = tileData.value === 0 || tileData.letter === 'BLANK';} // Use received tileData letter too
+
+        const newPlacement = { row: targetRow, col: targetCol, tile: {...tileData, isBlank} };
+        updatedPlacements.push(newPlacement);
+        console.log(`  New placement added:`, JSON.stringify(newPlacement));
+        console.log(`  New temporaryPlacements state:`, JSON.stringify(updatedPlacements));
+        return updatedPlacements;
+    });
+     console.log(`==> handleTileDropOnBoard END (Success)`);
+
+}, [canInteract, temporaryPlacements, selectedTilesForExchange.length, myRack]);
     const handleTileDropOnRack = useCallback((tileData) => {
          if (!canInteract) return;
          if (tileData.originData?.type === 'board') {

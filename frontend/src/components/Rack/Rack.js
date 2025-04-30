@@ -24,6 +24,7 @@ const Rack = ({
     selectedForExchange = [], // Expects array of originalIndex numbers
     onTileSelect,
 }) => {
+    console.log("Rack Component - Received tiles prop:", JSON.stringify(tiles));
     // Ensure tiles is always an array
     const playerTiles = Array.isArray(tiles) ? tiles : [];
 

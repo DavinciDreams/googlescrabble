@@ -61,10 +61,10 @@ class GameState {
     // --- Player Management ---
     addPlayer(playerId, username) {
         console.log(`GameState [${this.gameId}]: Attempting to add player ${playerId} (${username}). Current status: ${this.status}, Current players: ${this.players.length}/${this.maxPlayers}`);
-        if (this.status !== 'waiting') { console.warn(/*...*/); return null; }
-        if (this.players.length >= this.maxPlayers) { console.warn(/*...*/); return null; }
-        if (this.players.some(p => p.id === playerId)) { console.warn(/*...*/); return null; }
-        if (this.players.some(p => p.username.toLowerCase() === username.toLowerCase())) { console.warn(/*...*/); return null; }
+        if (this.status !== 'waiting') { console.warn(`GameState [${this.gameId}]: Add player FAILED for ${playerId}. Game status is not 'waiting' (it's '${this.status}').`); return null; }
+        if (this.players.length >= this.maxPlayers) { console.warn(`GameState [${this.gameId}]: Add player FAILED for ${playerId}. Max players (${this.maxPlayers}) reached.`); return null; }
+        if (this.players.some(p => p.id === playerId)) { console.warn(`GameState [${this.gameId}]: Add player FAILED. Player ID ${playerId} already exists.`); return null; }
+        if (this.players.some(p => p.username.toLowerCase() === username.toLowerCase())) { console.warn(`GameState [${this.gameId}]: Add player FAILED. Username '${username}' already exists.`); return null; }
         const player = { id: playerId, username: username, score: 0, rack: [], isTurn: false };
         this.players.push(player);
         console.log(`GameState [${this.gameId}]: Player ${username} (${playerId}) added successfully. Total players: ${this.players.length}`);
@@ -77,18 +77,18 @@ class GameState {
         if (this.players.length < requiredPlayers || this.status !== 'waiting') { console.warn(/*...*/); return false; }
         console.log(`GameState [${this.gameId}]: Starting game with ${this.players.length} players.`);
         this.status = 'playing'; this.isFirstMove = true; this.consecutivePasses = 0;
-        this.players.forEach(player => { console.log(/*...*/); this.drawTiles(player, RACK_SIZE); });
+        this.players.forEach(player => { console.log(`GameState [${this.gameId}]: Dealing initial hand to ${player.username}...`); this.drawTiles(player, RACK_SIZE); });
         this.currentTurnIndex = Math.floor(Math.random() * this.players.length);
-        if (this.players[this.currentTurnIndex]) { this.players[this.currentTurnIndex].isTurn = true; console.log(/*...*/); return true; }
+        if (this.players[this.currentTurnIndex]) { this.players[this.currentTurnIndex].isTurn = true; console.log(`GameState [${this.gameId}]: Game started. Player ${this.players[this.currentTurnIndex].username}'s turn.`); return true; }
         else { console.error(/*...*/); this.status = 'error'; return false; }
     }
 
     // --- Tile Management ---
     drawTiles(player, numTiles) {
-        if (!player || !Array.isArray(player.rack)) { console.error(/*...*/); return []; }
+        if (!player || !Array.isArray(player.rack)) { console.error(`GameState [${this.gameId}]: Invalid player object provided to drawTiles.`); return []; }
         const drawnTiles = [];
         const numToDraw = Math.min(numTiles, this.tileBag.length);
-        // console.log(`GameState [${this.gameId}]: Player ${player.username} attempting draw ${numToDraw}. Bag: ${this.tileBag.length}.`);
+        // console.log(`GameState [${this.gameId}]: Player ${player.username} attempting draw ${numToDraw}. Bag: ${this.tileBag.length}.`); // Verbose
         for (let i = 0; i < numToDraw; i++) {
             const tile = this.tileBag.pop();
             if (tile) { drawnTiles.push(tile); } else { console.error(/*...*/); break; }
@@ -136,13 +136,12 @@ class GameState {
         if (this.tileBag.length < lettersToExchange.length) return { success: false, error: 'Not enough tiles in bag.' };
         const player = this.players[this.currentTurnIndex]; if (!player) return { success: false, error: 'Player not found.' };
         const playerRackLetters = player.rack.map(t => t.letter); const tempRack = [...playerRackLetters]; const actualTilesToRemove = [];
-        for (const letter of lettersToExchange) { // Validate player has tiles
+        for (const letter of lettersToExchange) {
             const indexInTemp = tempRack.indexOf(letter); if (indexInTemp === -1) return { success: false, error: `You do not have: ${letter}` };
             tempRack.splice(indexInTemp, 1); let found = false;
             for(let i = 0; i < player.rack.length; i++) { if(player.rack[i].letter === letter && !actualTilesToRemove.some(t => t === player.rack[i])) { actualTilesToRemove.push(player.rack[i]); found = true; break; } }
             if (!found) { console.error(/*...*/); return { success: false, error: `Internal error validating ${letter}.` }; }
         }
-        // Perform exchange
         player.rack = player.rack.filter(tile => !actualTilesToRemove.includes(tile)); this.tileBag.push(...actualTilesToRemove);
         this.tileBag = _.shuffle(this.tileBag); this.drawTiles(player, lettersToExchange.length);
         this.consecutivePasses = 0; this.advanceTurn();
@@ -151,30 +150,17 @@ class GameState {
     }
 
     placeValidMove(playerId, move) { // move = [{ letter, value, row, col, isBlank }, ...]
-        // ---> ADD INPUT VALIDATION <---
-        if (!Array.isArray(move) || move.some(tile => typeof tile?.letter !== 'string')) {
-             console.error(`GameState [${this.gameId}]: Invalid move data received from ${playerId}. Missing or invalid letters.`, move);
-             return { success: false, error: 'Invalid move data received. Malformed tile structure.' };
-        }
-        // ---> END INPUT VALIDATION <---
-    
         const turnCheck = this._checkTurn(playerId);
         if (!turnCheck.valid) return { success: false, error: turnCheck.error };
-    
+
         const player = this.players[this.currentTurnIndex];
         if (!player) return { success: false, error: 'Internal error: Current player not found.' };
-    
+
         // --- 1. Validate Tiles in Rack ---
         const neededTiles = {};
-        for (const tile of move) {
-            // Now we know tile.letter is a string (could be empty)
-            const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase();
-             if (!requiredLetter) { // Handle empty string case explicitly if it's invalid
-                 console.warn(`GameState [${this.gameId}]: Received move with empty letter string from ${playerId}.`);
-                 return { success: false, error: 'Move contains invalid empty tile letter.' };
-             }
-            neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1;
-        }
+        for (const tile of move) { const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase(); neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1; }
+        const currentRack = {}; player.rack.forEach(t => { currentRack[t.letter] = (currentRack[t.letter] || 0) + 1; });
+        for (const letter in neededTiles) { if (!currentRack[letter] || currentRack[letter] < neededTiles[letter]) return { success: false, error: `You don't have enough '${letter}' tiles.` }; }
 
         // --- 2. Placement Validation ---
         const placementValidation = this._validatePlacement(move);
@@ -188,7 +174,7 @@ class GameState {
         if (wordsData.length === 0 && move.length > 0) return { success: false, error: 'Move must form at least one word.' };
 
         // --- 4. Calculate Score ---
-        const scoreResult = this._calculateScore(move, wordsData); // Call the helper
+        const scoreResult = this._calculateScore(move, wordsData);
         const totalScore = scoreResult.score;
         const bingoBonus = scoreResult.bingoBonus;
         console.log(`GameState [${this.gameId}]: Calculated score: ${totalScore} (Bingo: ${bingoBonus})`);
@@ -203,8 +189,8 @@ class GameState {
              if (rackTileIndex === -1) { console.error(/*...*/); return { success: false, error: `Internal error: Tile ${requiredLetter} not found.` }; }
              const [rackTile] = currentRackCopy.splice(rackTileIndex, 1);
              rackTilesToRemove.push(rackTile);
-             square.tile = { letter: tile.letter.toUpperCase(), value: rackTile.value };
-             // Mark premium used AFTER score calculation (using original state)
+             square.tile = { letter: tile.letter.toUpperCase(), value: rackTile.value }; // Store original value
+             // Mark premium used AFTER score is calculated using original state
              if (square.premium) square.isPremiumUsed = true;
         }
         // b. Update player score
@@ -289,37 +275,40 @@ class GameState {
 
     _findFormedWords(move, orientation, lineCoords) {
         const wordsData = []; const tempBoard = _.cloneDeep(this.board);
-        const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`));
-        for (const tile of move) { tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value }; } // Value doesn't affect word finding
+        const moveCoordsSet = new Set(move.map(t => `${t.r}-${t.c}`));
+        for (const tile of move) { tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value }; }
 
         const checkWord = (startTileCoord, axis) => {
-             if (!startTileCoord) return; let r = startTileCoord.r; let c = startTileCoord.c;
-             if (axis === 'H') { while (c > 0 && tempBoard[r]?.[c - 1]?.tile) c--; } else { while (r > 0 && tempBoard[r - 1]?.[c]?.tile) r--; }
-             let currentWord = ''; const currentWordTiles = []; let currentPosR = r; let currentPosC = c;
-             while (currentPosR < BOARD_SIZE && currentPosC < BOARD_SIZE && tempBoard[currentPosR]?.[currentPosC]?.tile) {
-                 const currentSquare = tempBoard[currentPosR][currentPosC];
-                 const originalSquare = this.board[currentPosR][currentPosC];
-                 const originalTileValue = originalSquare.tile ? originalSquare.tile.value : TILE_DISTRIBUTION[currentSquare.tile.letter]?.value ?? 0; // Use actual tile value
-                 currentWord += currentSquare.tile.letter;
-                 currentWordTiles.push({ letter: currentSquare.tile.letter, value: originalTileValue, r: currentPosR, c: currentPosC, premium: originalSquare.premium, isPremiumUsed: originalSquare.isPremiumUsed, isNew: moveCoordsSet.has(`${currentPosR}-${currentPosC}`) });
-                 if (axis === 'H') currentPosC++; else currentPosR++;
-             }
-             if (currentWord.length > 1) {
-                  if (!dictionary.isValidWord(currentWord)) throw new Error(`Invalid word: ${currentWord}`);
-                  const wordKey = currentWord + '-' + currentWordTiles.map(t => `${t.r},${t.c}`).join('|');
-                  if (!wordsData.some(wd => wd.key === wordKey)) wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
-             }
-         };
+            if (!startTileCoord) return; let r = startTileCoord.r; let c = startTileCoord.c;
+            if (axis === 'H') { while (c > 0 && tempBoard[r]?.[c - 1]?.tile) c--; } else { while (r > 0 && tempBoard[r - 1]?.[c]?.tile) r--; }
+            let currentWord = ''; const currentWordTiles = []; let currentPosR = r; let currentPosC = c;
+            while (currentPosR < BOARD_SIZE && currentPosC < BOARD_SIZE && tempBoard[currentPosR]?.[currentPosC]?.tile) {
+                const currentSquare = tempBoard[currentPosR][currentPosC];
+                const originalSquare = this.board[currentPosR][currentPosC];
+                const originalTileValue = originalSquare.tile ? originalSquare.tile.value : TILE_DISTRIBUTION[currentSquare.tile.letter]?.value ?? 0;
+                currentWord += currentSquare.tile.letter;
+                currentWordTiles.push({ letter: currentSquare.tile.letter, value: originalTileValue, r: currentPosR, c: currentPosC, premium: originalSquare.premium, isPremiumUsed: originalSquare.isPremiumUsed, isNew: moveCoordsSet.has(`${currentPosR}-${currentPosC}`) });
+                if (axis === 'H') currentPosC++; else currentPosR++;
+            }
+            if (currentWord.length > 1) {
+                 if (!dictionary.isValidWord(currentWord)) throw new Error(`Invalid word: ${currentWord}`);
+                 const wordKey = `${currentWord}-${axis}-${r},${c}`;
+                 if (!wordsData.some(wd => wd.key === wordKey)) wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
+            }
+        };
 
-         try {
-              if (!lineCoords || lineCoords.length === 0) throw new Error("Internal: lineCoords missing.");
-              checkWord(lineCoords[0], orientation); // Check main word
-              const crossAxis = (orientation === 'H') ? 'V' : 'H';
-              for (const tile of move) { checkWord({ r: tile.row, c: tile.col }, crossAxis); } // Check cross words
-         } catch (error) { console.error(/*...*/); return { valid: false, error: error.message }; }
+        try {
+             if (!lineCoords || lineCoords.length === 0) throw new Error("Internal: lineCoords missing.");
+             checkWord(lineCoords[0], orientation); // Check main word
+             const crossAxis = (orientation === 'H') ? 'V' : 'H';
+             // Check cross words if main placement is a line OR it's a single tile
+             if (orientation === 'single' || (lineCoords && lineCoords.length >= 1)) {
+                for (const tile of move) { checkWord({ r: tile.row, c: tile.col }, crossAxis); }
+             }
+        } catch (error) { console.error(/*...*/); return { valid: false, error: error.message }; }
 
-         if (wordsData.length === 0 && move.length > 0) return { valid: false, error: 'Move must form word >= 2 letters.' };
-         return { valid: true, wordsData };
+        if (wordsData.length === 0 && move.length > 0) { return { valid: false, error: 'Move must form word >= 2 letters.' }; }
+        return { valid: true, wordsData };
     }
 
     _calculateScore(move, wordsData) {
@@ -327,22 +316,20 @@ class GameState {
         console.log(`GameState [${this.gameId}]: Calculating score for ${wordsData.length} word(s).`);
         for (const { word, tiles } of wordsData) {
             let currentWordScore = 0; let wordMultiplier = 1;
-             console.log(`  Scoring word: ${word}`);
+            console.log(`  Scoring word: ${word}`);
             for (const tile of tiles) {
-                let letterScore = tile.value; // Use value determined in _findFormedWords (original value)
-                if (tile.isNew) { // Only apply premiums for newly placed tiles
+                let letterScore = tile.value; // Use original value (0 for blank)
+                if (tile.isNew) { // Apply premiums only for newly placed tiles
                     const originalSquare = this.board[tile.r][tile.c];
-                    if (originalSquare.premium && !originalSquare.isPremiumUsed) { // Check if premium available
-                        console.log(`    Tile ${tile.letter} at (${tile.r},${tile.c}) hit unused premium: ${originalSquare.premium}`);
+                    if (originalSquare.premium && !originalSquare.isPremiumUsed) {
+                        console.log(`    Tile ${tile.letter} @(${tile.r},${tile.c}) hit premium: ${originalSquare.premium}`);
                         switch (originalSquare.premium) {
-                            case 'DL': letterScore *= 2; console.log(`      DL -> ${letterScore}`); break;
-                            case 'TL': letterScore *= 3; console.log(`      TL -> ${letterScore}`); break;
-                            case 'DW': wordMultiplier *= 2; console.log(`      DW -> Word x${wordMultiplier}`); break;
-                            case 'TW': wordMultiplier *= 3; console.log(`      TW -> Word x${wordMultiplier}`); break;
+                            case 'DL': letterScore *= 2; break;
+                            case 'TL': letterScore *= 3; break;
+                            case 'DW': wordMultiplier *= 2; break;
+                            case 'TW': wordMultiplier *= 3; break;
                         }
-                        if (originalSquare.isCenter && this.isFirstMove) { // Center bonus on first move
-                            wordMultiplier *= 2; console.log(`      Center bonus (DW) -> Word x${wordMultiplier}`);
-                        }
+                        if (originalSquare.isCenter && this.isFirstMove) { wordMultiplier *= 2; } // Center counts as DW
                     }
                 }
                  currentWordScore += letterScore;
@@ -373,15 +360,16 @@ class GameState {
 
          for (const player of this.players) {
              const rackValue = player.rack.reduce((sum, tile) => sum + tile.value, 0);
-             if (player.rack.length > 0) { player.score -= rackValue; scoreSumOfRacks += rackValue; console.log(`GameState [${this.gameId}]: ${player.username} loses ${rackValue} pts.`); }
+             if (player.rack.length > 0) { player.score -= rackValue; scoreSumOfRacks += rackValue; console.log(/*...*/); }
          }
-         if (playerWhoFinished) { playerWhoFinished.score += scoreSumOfRacks; console.log(`GameState [${this.gameId}]: ${playerWhoFinished.username} gains ${scoreSumOfRacks} pts.`); }
+         if (playerWhoFinished) { playerWhoFinished.score += scoreSumOfRacks; console.log(/*...*/); }
 
          this.finalScores = this.players.map(p => ({ id: p.id, username: p.username, finalScore: p.score }))
                             .sort((a, b) => b.finalScore - a.finalScore); // Sort descending
          console.log(`GameState [${this.gameId}]: Final scores:`, JSON.stringify(this.finalScores));
          this.players.forEach(p => p.isTurn = false); this.currentTurnIndex = -1;
     }
+
 
     // --- State Serialization ---
     getPublicState() {

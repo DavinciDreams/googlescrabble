@@ -1,3 +1,5 @@
+// backend/game/constants.js
+
 // Standard Scrabble Tile Distribution and Points (English)
 const TILE_DISTRIBUTION = {
     'A': { count: 9, value: 1 }, 'B': { count: 2, value: 3 }, 'C': { count: 2, value: 3 },
@@ -9,22 +11,22 @@ const TILE_DISTRIBUTION = {
     'S': { count: 4, value: 1 }, 'T': { count: 6, value: 1 }, 'U': { count: 4, value: 1 },
     'V': { count: 2, value: 4 }, 'W': { count: 2, value: 4 }, 'X': { count: 1, value: 8 },
     'Y': { count: 2, value: 4 }, 'Z': { count: 1, value: 10 },
-    'BLANK': { count: 2, value: 0 }
+    'BLANK': { count: 2, value: 0 } // Represents Blank tiles
 };
 
 const BOARD_SIZE = 15;
+const RACK_SIZE = 7;
 
-// Premium Square Types (can represent these in board state)
+// Premium Square Types
 const PREMIUM_SQUARES = {
     TW: 'Triple Word Score',
     DW: 'Double Word Score',
     TL: 'Triple Letter Score',
     DL: 'Double Letter Score',
-    ST: 'Start Square (usually DW)'
+    ST: 'Start Square (usually DW)' // Optional: May not be needed if handled by board layout
 };
 
-// Example: Define the actual board layout (can be a 2D array or object)
-// 0 = normal, 1=DL, 2=TL, 3=DW, 4=TW
+// Board layout (0 = normal, 1=DL, 2=TL, 3=DW, 4=TW) - Standard Layout
 const BOARD_LAYOUT = [
     [4,0,0,1,0,0,0,4,0,0,0,1,0,0,4],
     [0,3,0,0,0,2,0,0,0,2,0,0,0,3,0],
@@ -33,7 +35,7 @@ const BOARD_LAYOUT = [
     [0,0,0,0,3,0,0,0,0,0,3,0,0,0,0],
     [0,2,0,0,0,2,0,0,0,2,0,0,0,2,0],
     [0,0,1,0,0,0,1,0,1,0,0,0,1,0,0],
-    [4,0,0,1,0,0,0,3,0,0,0,1,0,0,4], // Center is often 3 (DW) or marked specially
+    [4,0,0,1,0,0,0,3,0,0,0,1,0,0,4], // Center [7][7] is often 3 (DW)
     [0,0,1,0,0,0,1,0,1,0,0,0,1,0,0],
     [0,2,0,0,0,2,0,0,0,2,0,0,0,2,0],
     [0,0,0,0,3,0,0,0,0,0,3,0,0,0,0],
@@ -43,11 +45,8 @@ const BOARD_LAYOUT = [
     [4,0,0,1,0,0,0,4,0,0,0,1,0,0,4],
 ];
 
-// Map layout numbers to premium types for easier logic
+// Map layout numbers to premium types for logic
 const PREMIUM_MAP = { 1: 'DL', 2: 'TL', 3: 'DW', 4: 'TW' };
-
-
-const RACK_SIZE = 7;
 
 module.exports = {
     TILE_DISTRIBUTION,

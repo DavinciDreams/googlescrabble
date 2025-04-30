@@ -76,8 +76,18 @@ function App() {
 
         const handleNewMessage = (message) => { setMessages(prev => [...prev, message]); }; // Used
         const handleInvalidMove = (error) => { console.warn(/*...*/); setLastGameError(`Invalid Move: ${error.message || '?'}`); setTemporaryPlacements([]); }; // Used
-        const handleError = (error) => { console.error(/*...*/); setLastGameError(`Error: ${error.message || '?'}`); }; // Used
-        const handlePlayerLeft = (leftPlayerInfo) => { console.log(/*...*/); setMessages(prev => [...prev, { system: true, text: `Player ${leftPlayerInfo.username || leftPlayerInfo.playerId.substring(0,6)} left.`}]); }; // Used
+// Inside frontend/src/App.js
+
+const handleError = (error) => { // Handles gameError event from server
+    console.error("Game Error Received:", error.message);
+    // ---> Update joinError specifically for join failures <---
+    if (error.message?.includes('not found') || error.message?.includes('full') || error.message?.includes('already started')) {
+        setJoinError(error.message); // Show specific join error on the form
+    } else {
+    // ---> Use lastGameError for other generic errors <---
+        setLastGameError(`Error: ${error.message || 'An unknown error occurred.'}`);
+    }
+};        const handlePlayerLeft = (leftPlayerInfo) => { console.log(/*...*/); setMessages(prev => [...prev, { system: true, text: `Player ${leftPlayerInfo.username || leftPlayerInfo.playerId.substring(0,6)} left.`}]); }; // Used
          const handleGameOver = (gameOverData) => { console.log(/*...*/); setGameState(prev => prev ? { ...prev, status: 'finished', finalScores: gameOverData.finalScores } : null); setTemporaryPlacements([]); setSelectedTilesForExchange([]); }; // Used
 
         // Setup Listeners

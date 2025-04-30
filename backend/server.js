@@ -94,23 +94,27 @@ io.on('connection', (socket) => {
     });
 
     // --- Place Tiles Handler ---
-    socket.on('placeTiles', (data) => {
-        const { gameId, move } = data || {};
-        console.log(`Received 'placeTiles' from ${playerId} for game ${gameId}`);
-        if (!gameId || !Array.isArray(move) || move.length === 0) { return socket.emit('gameError', { message: 'Invalid data format for placing tiles.' }); }
-        try {
-            const gameState = gameManager.getGameState(gameId);
-            if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
-            if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
-            const result = gameState.placeValidMove(playerId, move); // Delegate to GameState
-            if (result.success) {
-                console.log(`Player ${playerId} placed move in game ${gameId}. Score: ${result.score}.`);
-                io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Broadcast public state
-                if (result.gameOver) {
-                     console.log(`Game ${gameId} ended. Reason: ${result.reason || 'tiles'}`);
-                     io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: result.reason || 'tiles' });
-                }
-            } else {
+    if (result.success) {
+        console.log(`Player ${playerId} placed move in game ${gameId}. Score: ${result.score}.`);
+
+        // ---> FIX: Send specific state to mover, public to others <---
+        // 1. Send player-specific state (including new rack) back to the player who moved
+        const moverSpecificState = gameState.getPlayerSpecificState(playerId);
+        socket.emit('gameUpdate', moverSpecificState);
+        console.log(`   Sent specific gameUpdate to mover ${playerId}`);
+
+        // 2. Send public state update to everyone else in the room
+        const publicState = gameState.getPublicState();
+        socket.to(gameId).emit('gameUpdate', publicState); // Use socket.to() to exclude sender
+        console.log(`   Sent public gameUpdate to others in room ${gameId}`);
+        // ---> END FIX <---
+
+        // Check if the move ended the game
+        if (result.gameOver) {
+             console.log(`Game ${gameId} ended. Reason: ${result.reason || 'tiles'}`);
+             io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: result.reason || 'tiles' });
+        }
+    } else {
                 console.warn(`Invalid move by ${playerId} in game ${gameId}: ${result.error}`);
                 socket.emit('invalidMove', { message: result.error || 'Invalid move.' }); // Send only to player
             }

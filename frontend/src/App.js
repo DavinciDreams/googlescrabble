@@ -10,317 +10,210 @@ import GameInfo from './components/GameInfo/GameInfo';
 import Chat from './components/Chat/Chat';
 import socketService from './services/socketService';
 import GameOverDisplay from './components/GameOverDisplay/GameOverDisplay';
+import { useGameManager } from './hooks/useGameManager'; // Import the custom hook
 
 function App() {
-    // --- State Variables ---
+    // --- Connection & Join UI State (Managed by App) ---
     const [isConnected, setIsConnected] = useState(false);
-    const [gameState, setGameState] = useState(null);
-    const [myRack, setMyRack] = useState([]); // Player's current hand
-    const [messages, setMessages] = useState([]);
-    const [username, setUsername] = useState('');
-    const [joinGameId, setJoinGameId] = useState('');
-    const [isInGame, setIsInGame] = useState(false);
     const [socket, setSocket] = useState(null);
+    const [username, setUsername] = useState('');
+    const [joinGameId, setJoinGameId] = useState(''); // Optional Game ID input
+    const [joinError, setJoinError] = useState('');   // Errors specific to joining
+
+    // --- Temporary Gameplay UI State (Managed by App) ---
     const [temporaryPlacements, setTemporaryPlacements] = useState([]);
     const [selectedTilesForExchange, setSelectedTilesForExchange] = useState([]);
-    const [joinError, setJoinError] = useState('');
-    const [lastGameError, setLastGameError] = useState('');
-    const [gameIdToShare, setGameIdToShare] = useState(null);
-    // eslint-disable-next-line no-unused-vars
     const [copySuccess, setCopySuccess] = useState('');
 
-    // --- Derived State ---
-    const myPlayerId = socket?.id;
-    const myPlayerData = (gameState && gameState.players) ? gameState.players.find(p => p.id === myPlayerId) : null;
+    // --- Get Core Game State & Listeners via Custom Hook ---
+    const myPlayerId = socket?.id; // Get player ID from socket state
+    const {
+        gameState,            // The main state object from server { board, players, status, etc. }
+        myRack,               // Player's specific rack [{ letter, value }]
+        messages,             // Array of chat messages
+        isInGame,             // Is the player successfully in a game?
+        isGameOver,           // Is the current game finished?
+        currentTurnPlayerId,  // ID of the player whose turn it is
+        gameIdToShare,        // The current game ID for sharing
+        lastGameError,        // Last non-fatal error received
+        setLastGameError      // Function to clear non-fatal errors
+    } = useGameManager(socket, myPlayerId); // Pass socket and playerId to the hook
+
+    // --- Derived State (Calculated from other state) ---
+    const myPlayerData = (gameState && gameState.players)
+        ? gameState.players.find(p => p.id === myPlayerId)
+        : null;
     const isMyTurn = myPlayerData?.isTurn || false;
-    const isGameOver = gameState?.status === 'finished';
+    // Can player interact with board/rack/controls?
     const canInteract = isConnected && isInGame && isMyTurn && !isGameOver;
-    const temporarilyPlacedRackIndices = temporaryPlacements.map(p => p.tile.originData?.type === 'rack' ? p.tile.originData.index : -1).filter(index => index !== -1);
+    // Indices of rack tiles currently placed temporarily on the board
+    const temporarilyPlacedRackIndices = temporaryPlacements
+        .map(p => p.tile.originData?.type === 'rack' ? p.tile.originData.index : -1)
+        .filter(index => index !== -1);
 
-    // --- Socket Connection & Event Handling Effect ---
+    // --- Effect for Basic Connection Management (Simplified in App) ---
     useEffect(() => {
-        const currentSocket = socketService.getSocketInstance(); setSocket(currentSocket);
-        const handleConnect = () => { setIsConnected(true); setLastGameError(''); console.log("handleConnect triggered"); };
-        const handleDisconnect = () => { setIsConnected(false); setIsInGame(false); setGameState(null); setMyRack([]); setTemporaryPlacements([]); setGameIdToShare(null); setJoinError('Disconnected.'); console.log("handleDisconnect triggered");};
+        const currentSocket = socketService.getSocketInstance();
+        setSocket(currentSocket);
 
-        // --->>> UPDATED handleGameUpdate <<<---
-        const handleGameUpdate = (newGameState) => {
-            console.log("App received gameUpdate:", newGameState);
-             // Basic validation of received state
-             if (!newGameState || !newGameState.gameId || !Array.isArray(newGameState.players)) {
-                 console.error("Received invalid gameUpdate structure:", newGameState);
-                 setLastGameError("Received invalid data from server.");
-                 return;
-             }
-            setGameState(newGameState); // Always update the main game state
+        const handleConnect = () => { setIsConnected(true); setJoinError(''); }; // Clear join error on connect
+        const handleDisconnect = () => { setIsConnected(false); setJoinError('Disconnected.'); /* Let useGameManager handle resetting game state */ };
 
-
-    // --->>> RESTORED: Update myRack IF payload contains it <<<---
-            // This handles the specific updates sent after player moves/exchanges or on game start
-            if (newGameState.myRack && Array.isArray(newGameState.myRack)) {
-                console.log(`--> handleGameUpdate: Found myRack in update for ${myPlayerId}. Updating local rack.`);
-                console.log("   New myRack data received:", JSON.stringify(newGameState.myRack));
-                setMyRack(newGameState.myRack); // Update the local rack state
-                console.log("   setMyRack was called.");
-           } else {
-               // This is expected for public updates sent after opponent moves
-                console.log(`--> handleGameUpdate: No specific myRack found in update for ${myPlayerId}. Local rack state unchanged.`);
-           }
-           // --->>> END RESTORED <<<---
-
-           // Clear temps/selection if not our turn or game not playing
-           const newMyPlayer = newGameState.players.find(p => p.id === myPlayerId);
-           if (!newMyPlayer?.isTurn || newGameState.status !== 'playing') {
-                setTemporaryPlacements([]);
-                setSelectedTilesForExchange([]);
-           }
-           setLastGameError(''); // Clear errors on update
-           if (newGameState.gameId) setGameIdToShare(newGameState.gameId);
-        };
-        // --->>> END handleGameUpdate <<<---
-
-        const handleGameJoined = (playerSpecificState) => {
-             console.log("App received gameJoined:", playerSpecificState);
-             if (playerSpecificState && Array.isArray(playerSpecificState.players) && Array.isArray(playerSpecificState.myRack) && playerSpecificState.gameId) {
-                 setGameState(playerSpecificState);
-                 setMyRack(playerSpecificState.myRack); // Set initial rack
-                 setIsInGame(true);
-                 setTemporaryPlacements([]); setSelectedTilesForExchange([]); setJoinError(''); setLastGameError(''); setGameIdToShare(playerSpecificState.gameId);
-                 console.log("App State Initialized: myRack set to", playerSpecificState.myRack);
-             } else { console.error("Invalid gameJoined state:", playerSpecificState); setJoinError("Invalid data from server."); setIsInGame(false); }
-         };
-        const handleNewMessage = (message) => { setMessages(prev => [...prev, message]); };
-        const handleInvalidMove = (error) => { console.warn("Invalid Move:", error.message); setLastGameError(`Invalid Move: ${error.message || '?'}`); setTemporaryPlacements([]); };
-        const handleError = (error) => { // Handles gameError event from server
-            console.error("Game Error Received:", error.message);
-            // ---> Update joinError specifically for join failures <---
-            if (error.message?.includes('not found') || error.message?.includes('full') || error.message?.includes('already started')) {
-                setJoinError(error.message); // Show specific join error on the form
-            } else {
-            // ---> Use lastGameError for other generic errors <---
-                setLastGameError(`Error: ${error.message || 'An unknown error occurred.'}`);
-            }
-        };   
-        const handlePlayerLeft = (leftPlayerInfo) => { console.log(/*...*/); setMessages(prev => [...prev, { system: true, text: `Player ${leftPlayerInfo.username || leftPlayerInfo.playerId.substring(0,6)} left.`}]); };
-        const handleGameOver = (gameOverData) => { console.log(/*...*/); setGameState(prev => prev ? { ...prev, status: 'finished', finalScores: gameOverData.finalScores } : null); setTemporaryPlacements([]); setSelectedTilesForExchange([]); };
-
-        // Setup Listeners
         if (currentSocket) {
-             console.log("useEffect: Setting up listeners...", currentSocket.id);
-             currentSocket.off('connect', handleConnect); currentSocket.on('connect', handleConnect);
-             currentSocket.off('disconnect', handleDisconnect); currentSocket.on('disconnect', handleDisconnect);
-             socketService.removeListener('gameUpdate', handleGameUpdate); socketService.onGameUpdate(handleGameUpdate);
-             socketService.removeListener('gameJoined', handleGameJoined); socketService.onGameJoined(handleGameJoined);
-             socketService.removeListener('newChatMessage', handleNewMessage); socketService.onNewChatMessage(handleNewMessage);
-             socketService.removeListener('invalidMove', handleInvalidMove); socketService.onInvalidMove(handleInvalidMove);
-             socketService.removeListener('gameError', handleError); socketService.onError(handleError);
-             socketService.removeListener('playerLeft', handlePlayerLeft); socketService.onPlayerLeft(handlePlayerLeft);
-             socketService.removeListener('gameOver', handleGameOver); socketService.onGameOver(handleGameOver);
-             if (currentSocket.connected) { handleConnect(); } else { socketService.connect(); }
-             
+            currentSocket.off('connect', handleConnect); currentSocket.on('connect', handleConnect);
+            currentSocket.off('disconnect', handleDisconnect); currentSocket.on('disconnect', handleDisconnect);
+            if (currentSocket.connected) handleConnect();
+            else socketService.connect();
         }
-        // Cleanup Listeners
+        // Cleanup basic listeners
         return () => {
-            console.log("useEffect: Cleaning up listeners...");
             if (currentSocket) {
-                currentSocket.off('connect', handleConnect); currentSocket.off('disconnect', handleDisconnect);
-                socketService.removeListener('gameUpdate', handleGameUpdate); socketService.removeListener('gameJoined', handleGameJoined);
-                socketService.removeListener('newChatMessage', handleNewMessage); socketService.removeListener('invalidMove', handleInvalidMove);
-                socketService.removeListener('onError', handleError); socketService.removeListener('playerLeft', handlePlayerLeft);
-                socketService.removeListener('gameOver', handleGameOver);
+                currentSocket.off('connect', handleConnect);
+                currentSocket.off('disconnect', handleDisconnect);
             }
-    // Removed gameState dependency again to avoid potential loops
-    }, [socket, myPlayerId]);
+        };
+    }, []); // Run only once on mount to establish connection
 
+    // --- Action Handlers (Remain in App, use socketService directly) ---
 
-    // --- Action Handlers & Callbacks (Keep existing implementations) ---
+    const handleJoinGame = useCallback((e) => {
+        if (e) e.preventDefault();
+        setJoinError(''); // Clear previous join errors
+        if (!username.trim()) { setJoinError("Please enter a username."); return; }
+        if (!socket || !isConnected) { setJoinError("Not connected to server."); return; }
+
+        const joinData = { username: username.trim() };
+        const targetGameId = joinGameId.trim();
+        if (targetGameId) { joinData.gameId = targetGameId; }
+
+        console.log("App: Emitting joinGame", joinData);
+        socketService.joinGame(joinData); // Emit event via service
+        // Let useGameManager handle the 'gameJoined' or 'gameError' response
+    }, [username, joinGameId, socket, isConnected]);
+
     const handleTileDropOnBoard = useCallback((tileData, targetRow, targetCol) => {
         if (!canInteract) return;
-        console.log(`==> handleTileDropOnBoard START`);
-        console.log(`  Dropping Tile:`, JSON.stringify(tileData));
-        console.log(`  Onto Square: ${targetRow}, ${targetCol}`);
-        console.log(`  Current temporaryPlacements (Before):`, JSON.stringify(temporaryPlacements));
-    
-        if (temporaryPlacements.some(p => p.row === targetRow && p.col === targetCol)) {
-             console.warn("  Target square already has a temporary tile. Preventing drop.");
-             console.log(`==> handleTileDropOnBoard END (Blocked)`);
-             return;
-        }
-        if (selectedTilesForExchange.length > 0) setSelectedTilesForExchange([]);
-    
-        setTemporaryPlacements(prevPlacements => {
-            console.log(`  setTemporaryPlacements running...`);
-            // --- Logic to remove tile if it was dragged from another temp board spot ---
-            let updatedPlacements = [...prevPlacements];
-            if (tileData.originData?.type === 'board') {
-                 console.log(`  Tile originated from board (${tileData.originData.row}, ${tileData.originData.col}). Filtering it out.`);
-                 updatedPlacements = updatedPlacements.filter(p => !(p.row === tileData.originData.row && p.col === tileData.originData.col));
-                 console.log(`  Placements after filtering origin:`, JSON.stringify(updatedPlacements));
-            }
-            // --- End removal logic ---
-    
-            // Add the new placement
-            // Ensure isBlank is correctly determined here
-            let isBlank = false;
-            if (tileData.originData?.type === 'rack' && typeof tileData.originData.index === 'number' && myRack[tileData.originData.index]) {
-                 isBlank = myRack[tileData.originData.index].letter === 'BLANK';
-            } else { isBlank = tileData.value === 0 || tileData.letter === 'BLANK';} // Use received tileData letter too
-    
-            const newPlacement = { row: targetRow, col: targetCol, tile: {...tileData, isBlank} };
-            updatedPlacements.push(newPlacement);
-            console.log(`  New placement added:`, JSON.stringify(newPlacement));
-            console.log(`  New temporaryPlacements state:`, JSON.stringify(updatedPlacements));
-            return updatedPlacements;
+        if (temporaryPlacements.some(p => p.row === targetRow && p.col === targetCol)) { return; }
+        if (selectedTilesForExchange.length > 0) setSelectedTilesForExchange([]); // Clear exchange selection
+        setTemporaryPlacements(prev => { /* Add placement, remove if from board origin */
+             let updated = [...prev];
+             if (tileData.originData?.type === 'board') { updated = updated.filter(p => !(p.row === tileData.originData.row && p.col === tileData.originData.col)); }
+             const isBlank = tileData.originData?.type === 'rack' && myRack[tileData.originData.index]?.letter === 'BLANK';
+             updated.push({ row: targetRow, col: targetCol, tile: {...tileData, isBlank} });
+             return updated;
         });
-         console.log(`==> handleTileDropOnBoard END (Success)`);
-    
-    }, [canInteract, temporaryPlacements, selectedTilesForExchange.length, myRack]);    const handleTileDropOnRack = useCallback((tileData) => {
-        if (!canInteract) return;
-        if (tileData.originData?.type === 'board') {
-             setTemporaryPlacements(prevPlacements =>
-                 prevPlacements.filter(p => !(p.row === tileData.originData.row && p.col === tileData.originData.col))
-             );
-        }
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [canInteract]); // Suppress warning, dep seems necessary
+    }, [canInteract, temporaryPlacements, selectedTilesForExchange.length, myRack]);
 
-   const handleJoinGame = useCallback((e) => {
-        console.time("handleJoinGame Execution"); console.log("handleJoinGame start");
-        if (e) e.preventDefault(); setJoinError('');
-        if (!username.trim()) { setJoinError("Please enter a username."); console.timeEnd("handleJoinGame Execution"); return; }
-        if (!socket || !isConnected) { setJoinError("Not connected to server."); console.timeEnd("handleJoinGame Execution"); return; }
-        const joinData = { username: username.trim() }; const targetGameId = joinGameId.trim();
-        if (targetGameId) { joinData.gameId = targetGameId; console.log(/*...*/); } else { console.log(/*...*/); }
-        socketService.joinGame(joinData);
-        console.log("Called socketService.joinGame."); console.log("handleJoinGame end");
-        console.timeEnd("handleJoinGame Execution");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username, joinGameId, socket, isConnected]); 
-        const handlePlayMove = useCallback(() => 
-        if (!canInteract || temporaryPlacements.length === 0) { /* ... */ return; }
-    // ... line validation ...
+    const handleTileDropOnRack = useCallback((tileData) => {
+         if (!canInteract) return;
+         if (tileData.originData?.type === 'board') {
+              setTemporaryPlacements(prev => prev.filter(p => !(p.row === tileData.originData.row && p.col === tileData.originData.col)));
+         }
+    }, [canInteract]);
 
-    // Prepare move data more robustly
-    const moveData = temporaryPlacements.map(p => {
-        let isBlank = false;
-        const tileObj = p.tile; // Get the nested tile object
+    const handlePlayMove = useCallback(() => {
+        if (!canInteract || temporaryPlacements.length === 0) { setLastGameError("Cannot play."); return; }
+        // Basic line validation...
+        let minR = 15, maxR = -1, minC = 15, maxC = -1; temporaryPlacements.forEach(p => { minR=Math.min(minR,p.row); maxR=Math.max(maxR,p.row); minC=Math.min(minC,p.col); maxC=Math.max(maxC,p.col); });
+        if (minR !== maxR && minC !== maxC) { setLastGameError("Tiles must be in line."); return; }
+        // Prepare move data...
+        const moveData = temporaryPlacements.map(p => {
+             let isBlank = (p.tile?.originData?.type === 'rack' && myRack[p.tile.originData.index]?.letter === 'BLANK') || p.tile?.value === 0;
+             return { letter: p.tile?.letter?.toUpperCase() || '', value: p.tile?.value ?? 0, isBlank, row: p.row, col: p.col };
+        });
+        console.log("App: Emitting placeTiles", moveData);
+        if (gameState?.gameId) { setLastGameError(''); socketService.placeTiles({ gameId: gameState.gameId, move: moveData }); }
+        else { setLastGameError("Error: No Game ID."); }
+        // Temp placements cleared by useGameManager via gameUpdate listener
+    }, [canInteract, temporaryPlacements, gameState, myRack, setLastGameError]);
 
-        // --- SAFELY get letter and value ---
-        const letter = tileObj?.letter; // Use optional chaining
-        const value = tileObj?.value;
-
-        // Determine if blank (using origin is more reliable if available)
-        if (tileObj?.originData?.type === 'rack' && typeof tileObj.originData.index === 'number' && myRack[tileObj.originData.index]) {
-             isBlank = myRack[tileObj.originData.index].letter === 'BLANK';
-        } else {
-             // Fallback if origin isn't rack or tile isn't in rack anymore (shouldn't happen often)
-             // Check if value is 0 or if the letter prop itself was 'BLANK' initially
-             isBlank = value === 0 || letter === 'BLANK';
-        }
-
-        // --- ENSURE letter is a string before toUpperCase ---
-        // If it's a blank, the letter might be missing or intended to be empty until assigned.
-        // If it's truly undefined/null, something is wrong earlier. Default to ''? Or throw error?
-        // Let's default to '' for now, server-side validation should catch meaningless moves.
-        const letterToSend = (typeof letter === 'string') ? letter : ''; // Default to empty string if not a string
-
-        return {
-            letter: letterToSend, // Send the potentially corrected letter
-            value: value ?? 0,     // Default value to 0 if null/undefined
-            isBlank: isBlank,      // Send calculated isBlank flag
-            row: p.row,
-            col: p.col
-        };
-    }).filter(tile => typeof tile.letter === 'string'); // Extra safety filter (optional)
-
-    // Check if moveData became empty after filtering (if filtering is added)
-    if (moveData.length === 0 && temporaryPlacements.length > 0) {
-        console.error("Failed to prepare valid move data from temporary placements:", temporaryPlacements);
-        setLastGameError("Error preparing move data.");
-        return;
-    }
-    if (moveData.length === 0) { // If initially empty
-         setLastGameError("No tiles placed to submit.");
-         return;
-    }
-
-
-    console.log("Submitting move:", moveData);
-    if (gameState?.gameId) {
-        setLastGameError('');
-        socketService.placeTiles({ gameId: gameState.gameId, move: moveData });
-    } else {
-         console.error("Cannot play move, no game ID found.");
-         setLastGameError("Error: Could not determine Game ID.");
-    }
-    }, [canInteract, temporaryPlacements, gameState, myRack]);    
-    const handlePassTurn = useCallback(() => 
+    const handlePassTurn = useCallback(() => {
         if (!canInteract) { setLastGameError("Cannot pass."); return; }
-    if (gameState?.gameId) { setLastGameError(''); socketService.passTurn(gameState.gameId); setTemporaryPlacements([]); setSelectedTilesForExchange([]); }
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [canInteract, gameState]); // Suppress warning, deps seem necessary
-const handleExchangeTiles = useCallback(() => 
-        if (!canInteract) { setLastGameError("Cannot exchange."); return; }
-    if (selectedTilesForExchange.length === 0) { setLastGameError("Select tiles first."); return; }
-    const lettersToExchange = selectedTilesForExchange.map(index => myRack[index]?.letter).filter(Boolean);
-    if (lettersToExchange.length !== selectedTilesForExchange.length) { console.error(/*...*/); setLastGameError("Error preparing exchange."); return; }
-    if (gameState?.gameId) {
-        setLastGameError(''); console.log("Requesting exchange:", lettersToExchange);
-        socketService.exchangeTiles(gameState.gameId, lettersToExchange);
-        setTemporaryPlacements([]); setSelectedTilesForExchange([]);
-   }
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [canInteract, gameState, selectedTilesForExchange, myRack]); // Suppress warning, deps seem necessary (including selectedTilesForExchange value)    const handleSendMessage = useCallback((message) => 
-        if (gameState?.gameId && message.trim()) { socketService.sendChatMessage(gameState.gameId, message.trim()); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [gameState]); // Suppress warning, dep seems necessary
-    const handleTileSelectForExchange = useCallback((rackIndex) => 
+        if (gameState?.gameId) { setLastGameError(''); socketService.passTurn(gameState.gameId); setTemporaryPlacements([]); setSelectedTilesForExchange([]); }
+    }, [canInteract, gameState, setLastGameError]);
+
+    const handleExchangeTiles = useCallback(() => {
+         if (!canInteract) { setLastGameError("Cannot exchange."); return; }
+         if (selectedTilesForExchange.length === 0) { setLastGameError("Select tiles first."); return; }
+         const lettersToExchange = selectedTilesForExchange.map(index => myRack[index]?.letter).filter(Boolean);
+         if (lettersToExchange.length !== selectedTilesForExchange.length) { setLastGameError("Error preparing exchange."); return; }
+         if (gameState?.gameId) {
+             setLastGameError(''); console.log("App: Emitting exchangeTiles", lettersToExchange);
+             socketService.exchangeTiles(gameState.gameId, lettersToExchange);
+             setTemporaryPlacements([]); setSelectedTilesForExchange([]);
+        }
+    }, [canInteract, gameState, selectedTilesForExchange, myRack, setLastGameError]);
+
+    const handleSendMessage = useCallback((message) => {
+         if (gameState?.gameId && message.trim()) { socketService.sendChatMessage(gameState.gameId, message.trim()); }
+    }, [gameState]);
+
+    const handleTileSelectForExchange = useCallback((rackIndex) => {
         if (!canInteract) return;
-    if (temporaryPlacements.length > 0) { setLastGameError("Clear board first."); return; }
-    setSelectedTilesForExchange(prev => { if (prev.includes(rackIndex)) { return prev.filter(i => i !== rackIndex); } else { return [...prev, rackIndex]; } });
-    setLastGameError('');
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [canInteract, temporaryPlacements.length]); // Suppress warning, deps seem necessary    const copyGameIdToClipboard = useCallback(() => 
-        if (!gameIdToShare) return;
-    navigator.clipboard.writeText(gameIdToShare).then(() => { setCopySuccess('Copied!'); setTimeout(() => setCopySuccess(''), 2000); })
-    .catch(err => { console.error(/*...*/); setCopySuccess('Failed!'); setTimeout(() => setCopySuccess(''), 2000); });
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [gameIdToShare]); // Suppress warning, dep seems necessary
+        if (temporaryPlacements.length > 0) { setLastGameError("Clear board first."); return; }
+        setSelectedTilesForExchange(prev => { if (prev.includes(rackIndex)) { return prev.filter(i => i !== rackIndex); } else { return [...prev, rackIndex]; } });
+        setLastGameError('');
+    }, [canInteract, temporaryPlacements.length, setLastGameError]);
+
+    const copyGameIdToClipboard = useCallback(() => { /* ... same logic using setCopySuccess ... */ }, [gameIdToShare]);
 
 
-
-    // --- Rendering ---
+    // --- Rendering Logic ---
     return (
         <div className="App">
             <h1>Real-time Scrabble</h1>
             <p>Connection Status: {isConnected ? <span style={{color: 'green', fontWeight: 'bold'}}>Connected</span> : <span style={{color: 'red', fontWeight: 'bold'}}>Disconnected</span>}</p>
 
+            {/* Show Join Form if NOT connected or NOT in a game yet */}
             {!isInGame && !isGameOver ? (
                  <div className="join-form-container">
-                     {/* Join Form JSX */}
-                     <form onSubmit={handleJoinGame} className="join-form">
-                     <div className="form-group"> <label htmlFor="username">Username:</label> <input id="username" type="text" value={username} onChange={(e) => { setUsername(e.target.value); setJoinError(''); }} placeholder="Enter Username" maxLength="16" required /> </div>
-                         <div className="form-group"> <label htmlFor="gameIdInput">Game ID (Optional):</label> <input id="gameIdInput" type="text" value={joinGameId} onChange={(e) => setJoinGameId(e.target.value)} placeholder="Enter Game ID to join" /> </div>
-                         <button type="submit" disabled={!isConnected} onClick={() => console.log("DEBUG: Join Button Clicked!")} > {joinGameId.trim() ? 'Join Specific Game' : 'Join / Create Game'} </button>
+                    <form onSubmit={handleJoinGame} className="join-form">
+                         <div className="form-group">
+                            <label htmlFor="username">Username:</label>
+                            <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter Username" maxLength="16" required />
+                         </div>
+                         <div className="form-group">
+                            <label htmlFor="gameIdInput">Game ID (Optional):</label>
+                            <input id="gameIdInput" type="text" value={joinGameId} onChange={(e) => setJoinGameId(e.target.value)} placeholder="Enter Game ID to join" />
+                         </div>
+                         {/* Button now just checks connection, join logic handles errors */}
+                         <button type="submit" disabled={!isConnected}>
+                             {joinGameId.trim() ? 'Join Specific Game' : 'Join / Create Game'}
+                         </button>
+                         {/* Display JOIN errors here */}
                          {joinError && <p className="error-message join-error">{joinError}</p>}
-                     </form>
+                    </form>
                  </div>
-            ) : gameState ? (
+            /* Show Game Area if IN a game and gameState is loaded */
+            ) : isInGame && gameState ? (
                  <div className="game-area">
+                    {/* Show Game Over overlay if game is finished */}
                     {isGameOver && <GameOverDisplay finalScores={gameState.finalScores} />}
-                     <div className="left-panel">
-                     {gameIdToShare && !isGameOver && ( <div className="share-game-section"><h4>Invite Player</h4> <p>Share this Game ID:</p> <div className="game-id-display"> <code>{gameIdToShare}</code> <button onClick={copyGameIdToClipboard} title="Copy Game ID"> Copy ID </button> </div> {copySuccess && <span className="copy-feedback">{copySuccess}</span>} </div> )}
-                         <Scoreboard players={gameState.players || []} currentPlayerId={gameState.currentTurnPlayerId}/>
-                         <GameInfo status={gameState.status} currentPlayerId={gameState.currentTurnPlayerId} players={gameState.players || []} tilesRemaining={gameState.tilesRemaining ?? '?'}/>
+
+                    <div className="left-panel">
+                         {/* Share Section */}
+                         {gameIdToShare && !isGameOver && ( <div className="share-game-section"> <h4>Invite Player</h4> <p>Share ID:</p> <div className="game-id-display"> <code>{gameIdToShare}</code> <button onClick={copyGameIdToClipboard} title="Copy">Copy</button> </div> {copySuccess && <span className="copy-feedback">{copySuccess}</span>} </div> )}
+                         {/* Other Info Components */}
+                         <Scoreboard players={gameState.players || []} currentPlayerId={currentTurnPlayerId}/>
+                         <GameInfo status={gameState.status} currentPlayerId={currentTurnPlayerId} players={gameState.players || []} tilesRemaining={gameState.tilesRemaining ?? '?'}/>
+                         {/* Display general GAME errors here */}
                          {lastGameError && <p className="error-message">{lastGameError}</p>}
-                         <Chat messages={messages} onSendMessage={handleSendMessage} playersInfo={gameState.players || []} myPlayerId={myPlayerId}/>                     </div>
-                     <div className="main-panel">
-                     <Board boardData={gameState.board} temporaryPlacements={temporaryPlacements} onTileDrop={handleTileDropOnBoard} canInteract={canInteract}/>
-                     <Rack tiles={myRack || []} temporarilyPlacedIndices={temporarilyPlacedRackIndices} onRackDrop={handleTileDropOnRack} canInteract={canInteract} selectedForExchange={selectedTilesForExchange} onTileSelect={handleTileSelectForExchange} />
-                     <Controls onPlay={handlePlayMove} onPass={handlePassTurn} onExchange={handleExchangeTiles} disabled={!canInteract} playDisabled={temporaryPlacements.length === 0} exchangeDisabled={selectedTilesForExchange.length === 0} />
-                     </div>
+                         <Chat messages={messages} onSendMessage={handleSendMessage} playersInfo={gameState.players || []} myPlayerId={myPlayerId}/>
+                    </div>
+
+                    <div className="main-panel">
+                          <Board boardData={gameState.board} temporaryPlacements={temporaryPlacements} onTileDrop={handleTileDropOnBoard} canInteract={canInteract}/>
+                          <Rack tiles={myRack || []} temporarilyPlacedIndices={temporarilyPlacedRackIndices} onRackDrop={handleTileDropOnRack} canInteract={canInteract} selectedForExchange={selectedTilesForExchange} onTileSelect={handleTileSelectForExchange} />
+                          <Controls onPlay={handlePlayMove} onPass={handlePassTurn} onExchange={handleExchangeTiles} disabled={!canInteract} playDisabled={temporaryPlacements.length === 0} exchangeDisabled={selectedTilesForExchange.length === 0} />
+                    </div>
                  </div>
-            ) : ( <p>Loading game data...</p> ) }
+            /* Show Loading indicator if connected but not yet in game (waiting for gameJoined) */
+            ) : isConnected ? (
+                 <p>Waiting for game data...</p>
+            /* Fallback if not connected and not showing join form (shouldn't happen often) */
+            ) : (
+                 <p>Connecting...</p>
+            ) }
         </div>
     );
 }

@@ -3,9 +3,12 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
-const gameManager = require('./game/gameManager'); // Use the updated game manager
+const gameManager = require('./game/gameManager'); // Use the game manager
 
-const PORT = process.env.PORT || 3001;
+// Ensure environment variables (like PORT, FRONTEND_URL) are potentially loaded
+// require('dotenv').config(); // Uncomment if you use a .env file
+
+const PORT = process.env.PORT || 3001; // Use Render's port or 3001 locally
 
 const app = express();
 const server = http.createServer(app);
@@ -13,16 +16,19 @@ const server = http.createServer(app);
 // Setup Socket.IO Server
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "*", // Use env var for frontend URL in prod, wildcard for dev
+        // Use environment variable for production frontend URL
+        // Allow wildcard locally or if env var not set
+        origin: process.env.FRONTEND_URL || "*",
         methods: ["GET", "POST"]
     },
+    // Optional: Configure ping settings for connection stability
     // pingTimeout: 60000,
     // pingInterval: 25000
 });
 
-// Basic HTTP route (optional)
+// Basic HTTP route for health checks/info
 app.get('/', (req, res) => {
-    res.send('Scrabble Server is running!');
+    res.send(`Scrabble Server is running! Active games: ${gameManager.activeGames?.size || 0}`); // Example info
 });
 
 // Main Socket.IO Connection Logic
@@ -37,43 +43,44 @@ io.on('connection', (socket) => {
             console.error(`Invalid joinGame data from ${playerId}:`, data);
             return socket.emit('gameError', { message: 'Invalid username provided.' });
         }
-        const username = data.username.trim().slice(0, 16);
+        const username = data.username.trim().slice(0, 16); // Limit username length
         const targetGameId = typeof data.gameId === 'string' && data.gameId.trim() ? data.gameId.trim() : null;
 
         console.log(`Player ${playerId} [${username}] wants to join/create game. Target ID: ${targetGameId || 'None'}`);
 
         try {
-            // Use the updated gameManager function
+            // Use the gameManager function
             const { gameId, gameState, error } = gameManager.handleJoinRequest(playerId, username, targetGameId);
 
+            // Handle error or success
             if (error || !gameId || !gameState) {
                 console.error(`Failed to process joinGame for ${playerId}: ${error || 'Unknown reason'}`);
-                // Send specific error back to the user
-                return socket.emit('gameError', { message: error || 'Failed to join or create game.' });
+                return socket.emit('gameError', { message: error || 'Failed to join or create game.' }); // Send error back
             }
 
+            // Success - Join room and emit events
             console.log(`Player ${playerId} joining room ${gameId}`);
-            socket.join(gameId); // Join the Socket.IO room
+            socket.join(gameId);
 
-            // Send the initial state *specifically* to the joining player
+            // Send specific state to the joining player
             const playerSpecificState = gameState.getPlayerSpecificState(playerId);
             console.log(`Emitting 'gameJoined' to ${playerId}`);
             socket.emit('gameJoined', playerSpecificState);
 
-            // Notify *other* players in the room that someone joined
-            const player = gameState.players.find(p => p.id === playerId); // Get full player details
+            // Notify other players in the room
+            const player = gameState.players.find(p => p.id === playerId);
             if (player) {
                  const playerPublicInfo = { playerId: player.id, username: player.username, score: player.score };
                  console.log(`Emitting 'playerJoined' to room ${gameId} (except sender)`);
                  socket.to(gameId).emit('playerJoined', playerPublicInfo); // Use socket.to to exclude sender
             }
 
-            // Check if the game can start now (enough players joined)
+            // Check if the game can start now
             const gameStarted = gameManager.maybeStartGame(gameId);
             if (gameStarted) {
-                // If game started, send an update to everyone in the room
-                console.log(`Game ${gameId} started! Emitting initial gameUpdate.`);
-                io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Send public state to all
+                console.log(`Server: Game ${gameId} started! Emitting initial gameUpdate to room.`);
+                const currentPublicState = gameState.getPublicState();
+                io.to(gameId).emit('gameUpdate', currentPublicState); // Send public state to all
             }
 
         } catch (err) {
@@ -84,33 +91,38 @@ io.on('connection', (socket) => {
 
     // --- Place Tiles Handler ---
     socket.on('placeTiles', (data) => {
-        const { gameId, move } = data || {};
+        const { gameId, move } = data || {}; // Safely destructure
         console.log(`Received 'placeTiles' from ${playerId} for game ${gameId}`);
 
+        // Basic input validation
         if (!gameId || !Array.isArray(move) || move.length === 0) {
+            console.warn(`Invalid placeTiles data from ${playerId}. gameId: ${gameId}, move: ${move}`);
             return socket.emit('gameError', { message: 'Invalid data format for placing tiles.' });
         }
 
         try {
             const gameState = gameManager.getGameState(gameId);
-            if (!gameState) return socket.emit('gameError', { message: 'Game not found.' });
+            // Check if game exists and is playing
+            if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
 
-            // Delegate move validation and execution to GameState
+            // Delegate validation and execution to GameState instance
             const result = gameState.placeValidMove(playerId, move);
 
             if (result.success) {
                 console.log(`Player ${playerId} placed move in game ${gameId}. Score: ${result.score}.`);
-                io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Broadcast updated public state
+                // Broadcast the updated public state to everyone
+                io.to(gameId).emit('gameUpdate', gameState.getPublicState());
 
-                // Check if the move ended the game
+                // Check if the move resulted in game over
                 if (result.gameOver) {
-                     console.log(`Game ${gameId} ended. Reason: ${result.reason || 'tiles'}`);
+                     console.log(`Game ${gameId} ended after move. Reason: ${result.reason || 'tiles'}`);
                      io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: result.reason || 'tiles' });
                 }
             } else {
+                // Send invalid move reason back only to the sender
                 console.warn(`Invalid move by ${playerId} in game ${gameId}: ${result.error}`);
-                socket.emit('invalidMove', { message: result.error || 'Invalid move.' }); // Send only to player
+                socket.emit('invalidMove', { message: result.error || 'Invalid move.' });
             }
         } catch (err) {
             console.error(`CRITICAL ERROR processing placeTiles for ${playerId} in game ${gameId}:`, err);
@@ -120,29 +132,31 @@ io.on('connection', (socket) => {
 
     // --- Pass Turn Handler ---
     socket.on('passTurn', (data) => {
-        const { gameId } = data || {}; // Expect { gameId }
+        const { gameId } = data || {};
         console.log(`Received 'passTurn' from ${playerId} for game ${gameId}`);
 
-        if (!gameId) return socket.emit('gameError', { message: 'Game ID missing.' });
+        if (!gameId) return socket.emit('gameError', { message: 'Game ID missing for passTurn.' });
 
         try {
             const gameState = gameManager.getGameState(gameId);
-            if (!gameState) return socket.emit('gameError', { message: 'Game not found.' });
+            if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
 
+            // Delegate to GameState
             const result = gameState.passTurn(playerId);
 
             if (result.success) {
                 console.log(`Player ${playerId} passed turn in game ${gameId}.`);
                 io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Broadcast update
 
+                // Check if passing ended the game
                 if (result.gameOver) {
                      console.log(`Game ${gameId} ended due to consecutive passes.`);
-                     io.to(gameId).emit('gameOver', { finalScores: gameState.finalScores, reason: 'passes' });
+                     io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: 'passes' });
                  }
             } else {
                 console.warn(`Failed passTurn by ${playerId} in game ${gameId}: ${result.error}`);
-                socket.emit('gameError', { message: result.error || 'Cannot pass turn now.' });
+                socket.emit('gameError', { message: result.error || 'Cannot pass turn now.' }); // Send error back to player
             }
         } catch (err) {
             console.error(`CRITICAL ERROR processing passTurn for ${playerId} in game ${gameId}:`, err);
@@ -153,28 +167,30 @@ io.on('connection', (socket) => {
     // --- Exchange Tiles Handler ---
     socket.on('exchangeTiles', (data) => {
          const { gameId, tiles } = data || {}; // Expect tiles = ['A', 'B', 'BLANK']
-         console.log(`Received 'exchangeTiles' from ${playerId} for game ${gameId}`);
+         console.log(`Received 'exchangeTiles' from ${playerId} for game ${gameId} with tiles: ${tiles?.join(',')}`);
 
          if (!gameId || !Array.isArray(tiles) || tiles.length === 0) {
+            console.warn(`Invalid exchangeTiles data from ${playerId}. gameId: ${gameId}, tiles: ${tiles}`);
             return socket.emit('gameError', { message: 'Invalid data for exchanging tiles.' });
         }
 
          try {
             const gameState = gameManager.getGameState(gameId);
-            if (!gameState) return socket.emit('gameError', { message: 'Game not found.' });
+            if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
 
+            // Delegate to GameState
             const result = gameState.exchangeTiles(playerId, tiles);
 
             if (result.success) {
                 console.log(`Player ${playerId} exchanged tiles in game ${gameId}.`);
-                // Send specific update to the player with their new rack
+                // Send specific update TO THE PLAYER containing their new rack
                 socket.emit('gameUpdate', gameState.getPlayerSpecificState(playerId));
-                // Send general update to others (without the specific rack)
+                // Send general public update TO OTHERS in the room
                 socket.to(gameId).emit('gameUpdate', gameState.getPublicState());
             } else {
                  console.warn(`Failed exchangeTiles by ${playerId} in game ${gameId}: ${result.error}`);
-                 socket.emit('gameError', { message: result.error || 'Cannot exchange tiles now.' });
+                 socket.emit('gameError', { message: result.error || 'Cannot exchange tiles now.' }); // Send error back to player
             }
          } catch (err) {
              console.error(`CRITICAL ERROR processing exchangeTiles for ${playerId} in game ${gameId}:`, err);
@@ -185,11 +201,15 @@ io.on('connection', (socket) => {
     // --- Chat Message Handler ---
     socket.on('chatMessage', (data) => {
         const { gameId, message } = data || {};
-        if (!gameId || typeof message !== 'string' || message.trim().length === 0) return;
+        if (!gameId || typeof message !== 'string' || message.trim().length === 0) {
+             console.warn(`Invalid chat message data from ${playerId}:`, data);
+             return; // Ignore invalid chat messages silently
+        }
 
         const gameState = gameManager.getGameState(gameId);
+        // Attempt to find username, provide fallback
         const sender = gameState?.players.find(p => p.id === playerId);
-        const senderUsername = sender ? sender.username : playerId.substring(0, 6); // Fallback username
+        const senderUsername = sender ? sender.username : playerId.substring(0, 6);
 
         const messageData = {
             senderId: playerId,
@@ -209,18 +229,14 @@ io.on('connection', (socket) => {
             // Use gameManager to handle player removal and get necessary info
             const removalInfo = gameManager.removePlayer(playerId);
 
-            if (removalInfo && removalInfo.gameId) {
-                 const { gameId, updatedGameState, wasGameRemoved } = removalInfo;
+            // removalInfo structure: { gameId, wasGameRemoved, remainingPlayers, notifyOthers, updatedGameState, leavingPlayerUsername }
+            if (removalInfo && removalInfo.gameId && removalInfo.notifyOthers) {
+                 const { gameId, updatedGameState, wasGameRemoved, leavingPlayerUsername } = removalInfo;
 
-                 // Find username of leaving player if possible (before they are fully removed from state)
-                 const username = updatedGameState?.players.find(p => p.id === playerId)?.username || // Check remaining players first? No, check original state if needed
-                                  gameManager.getGameState(gameId)?.players.find(p => p.id === playerId)?.username || // Or check the state before removal if manager stores it?
-                                  playerId.substring(0, 6); // Fallback
+                 console.log(`Notifying room ${gameId} that player ${leavingPlayerUsername || playerId} left.`);
+                 const leftPlayerInfo = { playerId: playerId, username: leavingPlayerUsername || 'Player' };
 
-                 console.log(`Notifying room ${gameId} that player ${username} (${playerId}) left.`);
-                 const leftPlayerInfo = { playerId: playerId, username: username };
-
-                 // Notify remaining players
+                 // Notify remaining players someone left
                  io.to(gameId).emit('playerLeft', leftPlayerInfo);
 
                  // If game wasn't removed and state was updated (e.g., turn change, game end by forfeit)
@@ -235,12 +251,17 @@ io.on('connection', (socket) => {
                  } else if (wasGameRemoved) {
                     console.log(`Game ${gameId} was removed as it became empty.`);
                  }
+            } else if (removalInfo) {
+                 console.log(`Player ${playerId} removed, no further notifications needed (game already removed or no others left).`);
+            } else {
+                 console.log(`Player ${playerId} disconnected, was not found in any active game.`);
             }
         } catch(err) {
              console.error(`Error processing disconnect for ${playerId}:`, err);
+             // Cannot reliably emit back to the disconnected socket here
         }
     });
-});
+}); // End of io.on('connection')
 
 // Start the server
 server.listen(PORT, () => {

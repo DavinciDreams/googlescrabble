@@ -1,22 +1,29 @@
 // backend/game/gameState.js
 
 const { TILE_DISTRIBUTION, BOARD_SIZE, RACK_SIZE, BOARD_LAYOUT, PREMIUM_MAP } = require('./constants');
-const dictionary = require('../utils/dictionary');
-const _ = require('lodash'); // For shuffling and deep cloning
+const dictionary = require('../utils/dictionary'); // Ensure this utility works
+const _ = require('lodash'); // Ensure lodash is installed: npm install lodash
 
-// --- Helper Functions ---
-
+// --- Helper Function to Create and Shuffle the Tile Bag ---
 function createTileBag() {
     const bag = [];
-    for (const letter in TILE_DISTRIBUTION) {
-        const tileInfo = TILE_DISTRIBUTION[letter];
-        for (let i = 0; i < tileInfo.count; i++) {
-            bag.push({ letter: letter === 'BLANK' ? 'BLANK' : letter, value: tileInfo.value });
+    console.log("Creating tile bag...");
+    for (const letterKey in TILE_DISTRIBUTION) {
+        if (Object.hasOwnProperty.call(TILE_DISTRIBUTION, letterKey)) {
+            const tileInfo = TILE_DISTRIBUTION[letterKey];
+            const letter = letterKey === 'BLANK' ? 'BLANK' : letterKey;
+            for (let i = 0; i < tileInfo.count; i++) {
+                bag.push({ letter: letter, value: tileInfo.value });
+            }
         }
     }
-    return _.shuffle(bag);
+    console.log(`Total tiles before shuffle: ${bag.length}`);
+    const shuffledBag = _.shuffle(bag);
+    console.log("Tile bag created and shuffled.");
+    return shuffledBag;
 }
 
+// --- Initialize Board Helper ---
 function initializeBoard() {
     const board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
     for (let r = 0; r < BOARD_SIZE; r++) {
@@ -24,23 +31,22 @@ function initializeBoard() {
             const premiumCode = BOARD_LAYOUT[r][c];
             board[r][c] = {
                 premium: premiumCode !== 0 ? PREMIUM_MAP[premiumCode] : null,
-                tile: null,
-                isPremiumUsed: false
+                tile: null, // Initially empty
+                isPremiumUsed: false, // Track if premium has been scored
+                isCenter: (r === 7 && c === 7) // Mark center
             };
         }
     }
-    board[7][7].isCenter = true;
     return board;
 }
 
 // --- GameState Class ---
-
 class GameState {
     constructor(gameId) {
         this.gameId = gameId;
-        this.players = []; // { id: socket.id, username: 'name', score: 0, rack: [], isTurn: false }
+        this.players = []; // { id, username, score, rack: [{letter, value}], isTurn }
         this.board = initializeBoard();
-        this.tileBag = createTileBag();
+        this.tileBag = createTileBag(); // Create bag on instantiation
         this.currentTurnIndex = -1;
         this.status = 'waiting'; // 'waiting', 'playing', 'finished'
         this.consecutivePasses = 0;
@@ -48,162 +54,200 @@ class GameState {
         this.lastMove = null;
         this.isFirstMove = true;
         this.finalScores = null;
-        // Example: Define max players for this game instance
-        this.maxPlayers = 2; // Or 3, or 4
+        this.maxPlayers = 2; // Default max players (can be overridden if needed)
+        console.log(`GameState [${this.gameId}] created. Tile bag size: ${this.tileBag.length}`);
     }
 
     // --- Player Management ---
-
     addPlayer(playerId, username) {
-        // --- ADDED LOGGING START ---
         console.log(`GameState [${this.gameId}]: Attempting to add player ${playerId} (${username}). Current status: ${this.status}, Current players: ${this.players.length}/${this.maxPlayers}`);
 
-        // Check game status and player count
         if (this.status !== 'waiting') {
             console.warn(`GameState [${this.gameId}]: Add player FAILED for ${playerId}. Game status is not 'waiting' (it's '${this.status}').`);
-            return null; // Return null on failure
+            return null;
         }
-         if (this.players.length >= this.maxPlayers) {
+        if (this.players.length >= this.maxPlayers) {
             console.warn(`GameState [${this.gameId}]: Add player FAILED for ${playerId}. Max players (${this.maxPlayers}) reached.`);
-            return null; // Return null on failure
+            return null;
         }
-
-        // Check for existing player ID or username
         if (this.players.some(p => p.id === playerId)) {
              console.warn(`GameState [${this.gameId}]: Add player FAILED. Player ID ${playerId} already exists in this game.`);
-             // Decide: return null to prevent duplicate, or return existing player? Returning null for now.
-             return null;
+             return null; // Prevent duplicate adds
         }
+        // Case-insensitive username check
         if (this.players.some(p => p.username.toLowerCase() === username.toLowerCase())) {
              console.warn(`GameState [${this.gameId}]: Add player FAILED. Username '${username}' already exists in this game.`);
-             // Maybe emit specific error 'username taken' from server.js?
-             return null; // Return null on failure
+             return null; // Username taken in this game
          }
-        // --- ADDED LOGGING END ---
 
         // If all checks pass, create and add the player
         const player = {
             id: playerId,
             username: username,
             score: 0,
-            rack: [],
+            rack: [], // Empty rack initially
             isTurn: false
         };
         this.players.push(player);
-        // --- ADDED LOGGING ---
         console.log(`GameState [${this.gameId}]: Player ${username} (${playerId}) added successfully. Total players: ${this.players.length}`);
-        // --- ADDED LOGGING ---
-        return player; // Return the player object on success
+        return player; // Return the added player object
     }
 
+    // --- Game Start ---
     startGame() {
-        // Use this.maxPlayers defined in constructor or default to 2
         const requiredPlayers = this.maxPlayers;
         if (this.players.length < requiredPlayers || this.status !== 'waiting') {
             console.warn(`GameState ${this.gameId}: Cannot start game. Status: ${this.status}, Players: ${this.players.length}/${requiredPlayers}`);
-            return false;
+            return false; // Indicate game didn't start
         }
+
+        console.log(`GameState [${this.gameId}]: Starting game with ${this.players.length} players.`);
         this.status = 'playing';
-        this.players.forEach(player => {
-            this.drawTiles(player, RACK_SIZE);
-        });
-        this.currentTurnIndex = Math.floor(Math.random() * this.players.length);
-        this.players[this.currentTurnIndex].isTurn = true;
         this.isFirstMove = true;
-        console.log(`GameState ${this.gameId}: Game started with ${this.players.length} players. Player ${this.players[this.currentTurnIndex].username}'s turn.`);
-        return true;
+        this.consecutivePasses = 0;
+
+        // Deal initial tiles to each player
+        this.players.forEach(player => {
+            console.log(`GameState [${this.gameId}]: Dealing initial hand to ${player.username}...`);
+            this.drawTiles(player, RACK_SIZE); // Call drawTiles for each player
+        });
+
+        // Randomly select starting player
+        this.currentTurnIndex = Math.floor(Math.random() * this.players.length);
+        if (this.players[this.currentTurnIndex]) { // Ensure player exists
+             this.players[this.currentTurnIndex].isTurn = true;
+             console.log(`GameState [${this.gameId}]: Game started. Player ${this.players[this.currentTurnIndex].username}'s turn.`);
+             return true; // Game started successfully
+        } else {
+             console.error(`GameState ${this.gameId}: Could not assign turn, invalid index ${this.currentTurnIndex}`);
+             this.status = 'error'; // Indicate an error state
+             return false; // Game failed to start properly
+        }
     }
 
     // --- Tile Management ---
-
+    /**
+     * Draws a specified number of tiles from the bag and adds them to the player's rack.
+     * @param {object} player - The player object with a 'rack' array property.
+     * @param {number} numTiles - The number of tiles to attempt to draw.
+     * @returns {Array} - An array of the tiles actually drawn.
+     */
     drawTiles(player, numTiles) {
+        if (!player || !Array.isArray(player.rack)) {
+             console.error(`GameState [${this.gameId}]: Invalid player object provided to drawTiles.`);
+             return []; // Return empty array if player is invalid
+        }
         const drawnTiles = [];
-        for (let i = 0; i < numTiles && this.tileBag.length > 0; i++) {
-            drawnTiles.push(this.tileBag.pop());
+        const numToDraw = Math.min(numTiles, this.tileBag.length); // Don't draw more than available
+        console.log(`GameState [${this.gameId}]: Player ${player.username} attempting to draw ${numToDraw} tiles. Bag has ${this.tileBag.length}.`);
+        for (let i = 0; i < numToDraw; i++) {
+            const tile = this.tileBag.pop(); // Remove from end of shuffled bag
+            if (tile) { drawnTiles.push(tile); }
+            else { console.error(`GameState ${this.gameId}: tileBag.pop() returned undefined unexpectedly.`); break; }
         }
-        if (player && player.rack) {
-            player.rack.push(...drawnTiles);
-             // Avoid logging sensitive rack details frequently if possible
-             // console.log(`GameState ${this.gameId}: Player ${player.username} drew ${drawnTiles.length} tiles. Rack size: ${player.rack.length}. Bag remaining: ${this.tileBag.length}`);
-        } else {
-             console.error(`GameState ${this.gameId}: Invalid player object provided to drawTiles.`);
-        }
-        return drawnTiles;
+        player.rack.push(...drawnTiles); // Add the drawn tiles to the player's rack
+        console.log(`GameState [${this.gameId}]: Player ${player.username} drew ${drawnTiles.length} tiles. New rack size: ${player.rack.length}. Bag remaining: ${this.tileBag.length}`);
+        return drawnTiles; // Return the tiles that were drawn
     }
 
     // --- Turn and State ---
-
     _checkTurn(playerId) {
-         if (this.status !== 'playing') { return { valid: false, error: 'Game is not currently playing.' }; }
-         if (this.players.length === 0 || this.currentTurnIndex < 0) { return { valid: false, error: 'Game has not started or no players found.' }; }
-         if (this.players[this.currentTurnIndex]?.id !== playerId) { return { valid: false, error: 'Not your turn.' }; }
+        if (this.status !== 'playing') { return { valid: false, error: 'Game is not currently playing.' }; }
+        // Check if currentTurnIndex is valid before accessing players array
+        if (this.players.length === 0 || this.currentTurnIndex < 0 || this.currentTurnIndex >= this.players.length) {
+            console.warn(`GameState [${this.gameId}]: Turn check failed - invalid index ${this.currentTurnIndex} or no players.`);
+            return { valid: false, error: 'Game state invalid for turn check.' };
+        }
+        if (this.players[this.currentTurnIndex].id !== playerId) {
+            return { valid: false, error: 'Not your turn.' };
+        }
         return { valid: true };
     }
 
     advanceTurn() {
         if (this.status !== 'playing' || this.players.length <= 1) {
-            // Don't advance if game ended or only one player left
-            if (this.players.length === 1 && this.status === 'playing') {
-                 // Maybe end game here? For now, just don't advance.
+             if (this.players.length === 1 && this.status === 'playing') {
                  console.log(`GameState ${this.gameId}: Only one player left, turn not advanced.`);
-                 this.players[0].isTurn = true; // Ensure the remaining player knows it's their turn
-            }
+                 if(this.players[0]) this.players[0].isTurn = true; // Ensure remaining player has turn
+             }
              return;
         }
-
+        // Ensure currentTurnIndex is valid before accessing player
         if(this.currentTurnIndex >= 0 && this.currentTurnIndex < this.players.length) {
              this.players[this.currentTurnIndex].isTurn = false;
         }
         this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
-        this.players[this.currentTurnIndex].isTurn = true;
-        console.log(`GameState ${this.gameId}: Turn advanced to ${this.players[this.currentTurnIndex].username}.`);
+        // Ensure the new index is also valid before assigning turn
+        if(this.players[this.currentTurnIndex]) {
+            this.players[this.currentTurnIndex].isTurn = true;
+            console.log(`GameState ${this.gameId}: Turn advanced to ${this.players[this.currentTurnIndex].username}.`);
+        } else {
+             // This state indicates a serious problem, maybe reset to 0?
+             console.error(`GameState ${this.gameId}: Failed to advance turn, invalid new index ${this.currentTurnIndex}. Resetting turn to player 0.`);
+             this.currentTurnIndex = 0;
+             if(this.players.length > 0 && this.players[0]) this.players[0].isTurn = true;
+        }
     }
 
     // --- Player Actions ---
-
     passTurn(playerId) {
         const turnCheck = this._checkTurn(playerId);
         if (!turnCheck.valid) return { success: false, error: turnCheck.error };
 
         this.consecutivePasses++;
-        console.log(`GameState ${this.gameId}: Player ${playerId} passed. Consecutive passes: ${this.consecutivePasses}`);
+        console.log(`GameState [${this.gameId}]: Player ${playerId} passed. Consecutive passes: ${this.consecutivePasses}`);
 
-        // Example: 6 passes ends the game (adjust as needed)
-        const maxPasses = this.players.length * 3; // e.g., 3 rounds of passing
+        // Example: 6 passes ends the game for 2 players
+        const maxPasses = this.players.length * 3;
         if (this.consecutivePasses >= maxPasses) {
             console.log(`GameState ${this.gameId}: Game ending due to ${this.consecutivePasses} consecutive passes.`);
-            this._endGame('passes');
-            return { success: true, gameOver: true };
+            this._endGame('passes'); // Ends the game and calculates final scores
+            return { success: true, gameOver: true, finalScores: this.finalScores }; // Include finalScores
         } else {
             this.advanceTurn();
             return { success: true, gameOver: false };
         }
     }
 
-    exchangeTiles(playerId, lettersToExchange) {
+    exchangeTiles(playerId, lettersToExchange) { // lettersToExchange = ['A', 'BLANK', 'C']
         const turnCheck = this._checkTurn(playerId);
         if (!turnCheck.valid) return { success: false, error: turnCheck.error };
          if (this.tileBag.length < lettersToExchange.length) return { success: false, error: 'Not enough tiles in bag to exchange.' };
 
         const player = this.players[this.currentTurnIndex];
-        const playerRackLetters = player.rack.map(t => t.letter);
-        const tempRack = [...playerRackLetters];
-        const actualTilesToRemove = [];
+        if (!player) return { success: false, error: 'Internal error: Current player not found.' };
 
+        const playerRackLetters = player.rack.map(t => t.letter);
+        const tempRack = [...playerRackLetters]; // Use copy for validation counts
+        const actualTilesToRemove = []; // Store the actual tile objects {letter, value}
+
+        // Validate player has the tiles
         for (const letter of lettersToExchange) {
             const indexInTemp = tempRack.indexOf(letter);
             if (indexInTemp === -1) return { success: false, error: `You do not have the tile: ${letter}` };
-            tempRack.splice(indexInTemp, 1);
-             const tileObjIndex = player.rack.findIndex((tile, idx) => tile.letter === letter && !actualTilesToRemove.some(removedTile => removedTile === player.rack[idx]));
-             if (tileObjIndex !== -1) actualTilesToRemove.push(player.rack[tileObjIndex]);
-             else { console.error(`GameState ${this.gameId}: Tile object mismatch during exchange validation.`); return { success: false, error: `Internal error validating tile ${letter}.` }; }
+            tempRack.splice(indexInTemp, 1); // Remove from temp copy
+
+            // Find corresponding object in real rack, ensuring not to remove the same object instance twice
+             let found = false;
+             for(let i = 0; i < player.rack.length; i++) {
+                 if(player.rack[i].letter === letter && !actualTilesToRemove.some(t => t === player.rack[i])) {
+                    actualTilesToRemove.push(player.rack[i]);
+                    found = true;
+                    break;
+                 }
+             }
+             if (!found) {
+                 console.error(`GameState ${this.gameId}: Tile object mismatch during exchange validation for letter ${letter}.`);
+                 return { success: false, error: `Internal error validating tile ${letter}.` };
+             }
         }
 
-        player.rack = player.rack.filter(tile => !actualTilesToRemove.includes(tile));
-        this.tileBag.push(...actualTilesToRemove);
-        this.tileBag = _.shuffle(this.tileBag);
-        this.drawTiles(player, lettersToExchange.length);
-        this.consecutivePasses = 0;
+        // Perform exchange
+        player.rack = player.rack.filter(tile => !actualTilesToRemove.includes(tile)); // Remove from actual rack
+        this.tileBag.push(...actualTilesToRemove); // Add back to bag
+        this.tileBag = _.shuffle(this.tileBag); // Shuffle bag
+        this.drawTiles(player, lettersToExchange.length); // Draw new tiles
+        this.consecutivePasses = 0; // Exchange resets pass count
         this.advanceTurn();
 
         console.log(`GameState ${this.gameId}: Player ${playerId} exchanged ${lettersToExchange.length} tiles.`);
@@ -216,6 +260,7 @@ class GameState {
         if (!turnCheck.valid) return { success: false, error: turnCheck.error };
 
         const player = this.players[this.currentTurnIndex];
+        if (!player) return { success: false, error: 'Internal error: Current player not found.' };
 
         // --- 1. Validate Tiles in Rack ---
         const neededTiles = {};
@@ -231,7 +276,7 @@ class GameState {
             }
         }
 
-         // --- 2. Placement Validation ---
+         // --- 2. Placement Validation (Connectivity, Line, Board State) ---
          const placementValidation = this._validatePlacement(move);
          if (!placementValidation.valid) return { success: false, error: placementValidation.error };
          const { orientation, lineCoords } = placementValidation;
@@ -241,60 +286,66 @@ class GameState {
         if (!formedWordsResult.valid) return { success: false, error: formedWordsResult.error };
         const { wordsData } = formedWordsResult;
 
-        // --- Handle case where no words are formed (e.g., single tile placement not connecting) ---
-        // This might happen if connectivity check allows adjacent placement without forming a word > 1 letter
-        if (wordsData.length === 0 && !this.isFirstMove) {
-             // Re-check connectivity more strictly? Or assume validation passed means okay?
-             // If placement validation requires forming a word, this shouldn't happen.
-             // If just connectivity is required, this might be valid but score 0?
-             // For now, let's treat it as an invalid move if no words > 1 letter formed after first move.
-             console.warn(`GameState ${this.gameId}: Move by ${playerId} formed no words.`);
-             // return { success: false, error: 'Move must form at least one word.' }; // Uncomment if required
+        // If placement is valid but no words were formed (can happen with adjacent single tiles after first move)
+        if (wordsData.length === 0 && move.length > 0 && !this.isFirstMove) {
+            return { success: false, error: 'Move must form at least one word.' };
         }
-
+        if (this.isFirstMove && wordsData.length === 0 && move.length > 0) {
+             return { success: false, error: 'First move did not form a valid word.' };
+        }
 
         // --- 4. Calculate Score ---
          const scoreResult = this._calculateScore(move, wordsData);
          const totalScore = scoreResult.score;
          const bingoBonus = scoreResult.bingoBonus;
 
-        // --- 5. Update Game State ---
+        // --- 5. Update Game State (Board, Score, Rack) ---
+        const rackTilesToRemove = []; // Store actual rack tile objects to remove
+        const currentRackCopy = [...player.rack]; // Copy to find specific tile instances
+
         // a. Update board
         for (const tile of move) {
              const square = this.board[tile.row][tile.col];
-             square.tile = { letter: tile.letter.toUpperCase(), value: tile.isBlank ? 0 : tile.value }; // Use value from move (client calculated?) or re-lookup? Re-lookup is safer: TILE_DISTRIBUTION[tile.letter.toUpperCase()]?.value ?? 0
-             if (square.premium) square.isPremiumUsed = true;
+             // Find the specific tile object from the rack to get original value (esp. for BLANK)
+             const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase();
+             const rackTileIndex = currentRackCopy.findIndex(t => t.letter === requiredLetter);
+             if (rackTileIndex === -1) {
+                 console.error(`CRITICAL: Could not find required tile ${requiredLetter} in rack copy during board update.`);
+                 return { success: false, error: `Internal error: Tile ${requiredLetter} not found in rack.` };
+             }
+             const [rackTile] = currentRackCopy.splice(rackTileIndex, 1); // Remove from copy
+             rackTilesToRemove.push(rackTile); // Add original tile object to remove list
+
+             square.tile = {
+                 letter: tile.letter.toUpperCase(), // The letter displayed/used in word
+                 value: rackTile.value // The *original* value (0 for blank)
+             };
+             if (square.premium) square.isPremiumUsed = true; // Mark premium as used
         }
+
         // b. Update player score
         player.score += totalScore;
-        // c. Remove tiles from rack
-         const tempRack = [...player.rack];
-         const removedFromRack = [];
-         for (const tileNeededLetter of Object.keys(neededTiles)) {
-              let count = neededTiles[tileNeededLetter];
-              for (let i = tempRack.length - 1; i >= 0 && count > 0; i--) {
-                  if (tempRack[i].letter === tileNeededLetter) {
-                      removedFromRack.push(...tempRack.splice(i, 1));
-                      count--;
-                  }
-              }
-          }
-         player.rack = tempRack;
+
+        // c. Remove actual tiles from rack using the tracked objects
+        player.rack = player.rack.filter(tile => !rackTilesToRemove.includes(tile));
+
         // d. Draw new tiles
         this.drawTiles(player, move.length);
+
         // e. Update game state properties
         this.consecutivePasses = 0;
         this.isFirstMove = false;
-        this.lastMove = { playerId, move, wordsData, score: totalScore, bingoBonus };
+        this.lastMove = { playerId, move: move.map(m => ({...m})), wordsData, score: totalScore, bingoBonus }; // Store move details
         this.moveHistory.push(this.lastMove);
 
         // --- 6. Advance Turn ---
         this.advanceTurn();
 
         // --- 7. Check for Game Over (Post-Move) ---
-        const gameOverInfo = this._checkGameOver(player);
+        const gameOverInfo = this._checkGameOver(player); // Pass the player who just moved
         if (gameOverInfo.isOver) {
             console.log(`GameState ${this.gameId}: Game ending. Reason: ${gameOverInfo.reason}`);
+             // Return success but also game over flag and final scores
              return { success: true, score: totalScore, gameOver: true, finalScores: this.finalScores };
         } else {
             console.log(`GameState ${this.gameId}: Player ${playerId} placed move. Score: ${totalScore}.`);
@@ -305,158 +356,284 @@ class GameState {
     // --- Complex Logic Helpers (Private/Internal) ---
 
     _validatePlacement(move) {
-        // ... (Keep existing _validatePlacement implementation) ...
-         if (!move || move.length === 0) return { valid: false, error: 'Move is empty.' };
+        // Performs detailed placement rule checks.
+        if (!move || move.length === 0) return { valid: false, error: 'Move is empty.' };
         let minRow = 15, maxRow = -1, minCol = 15, maxCol = -1;
         const placedCoords = new Set();
-        for (const tile of move) { /* Check bounds, check empty */
+        for (const tile of move) {
             const { row, col } = tile;
-             if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return { valid: false, error: `Tile placement out of bounds (${row}, ${col}).` };
-             if (this.board[row][col].tile !== null) return { valid: false, error: `Square (${row}, ${col}) is already occupied.` };
-             minRow = Math.min(minRow, row); maxRow = Math.max(maxRow, row);
-             minCol = Math.min(minCol, col); maxCol = Math.max(maxCol, col);
-             placedCoords.add(`${row}-${col}`);
+            if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return { valid: false, error: `Tile placement out of bounds (${row}, ${col}).` };
+            if (this.board[row][col].tile !== null) return { valid: false, error: `Square (${row}, ${col}) is already occupied.` };
+            minRow = Math.min(minRow, row); maxRow = Math.max(maxRow, row);
+            minCol = Math.min(minCol, col); maxCol = Math.max(maxCol, col);
+            placedCoords.add(`${row}-${col}`);
         }
         let orientation = null;
         if (minRow === maxRow && minCol === maxCol) orientation = 'single';
         else if (minRow === maxRow) orientation = 'H';
         else if (minCol === maxCol) orientation = 'V';
         else return { valid: false, error: 'Tiles must be placed in a single line.' };
+
+        // Check for gaps using board state AND placed tiles
         const lineCoords = [];
-        if (orientation === 'H' || orientation === 'single') { /* Check horizontal gaps */
-             for (let c = minCol; c <= maxCol; c++) {
-                  lineCoords.push({ r: minRow, c });
-                  if (!placedCoords.has(`${minRow}-${c}`) && !this.board[minRow][c].tile) return { valid: false, error: 'Gap found in horizontal placement.' };
-              }
-         } else if (orientation === 'V') { /* Check vertical gaps */
-              for (let r = minRow; r <= maxRow; r++) {
-                   lineCoords.push({ r, c: minCol });
-                   if (!placedCoords.has(`${r}-${minCol}`) && !this.board[r][minCol].tile) return { valid: false, error: 'Gap found in vertical placement.' };
-               }
-         }
+        if (orientation === 'H' || orientation === 'single') {
+            for (let c = minCol; c <= maxCol; c++) {
+                const coordStr = `${minRow}-${c}`;
+                const square = this.board[minRow][c];
+                lineCoords.push({ r: minRow, c });
+                if (!square.tile && !placedCoords.has(coordStr)) return { valid: false, error: 'Gap found in horizontal placement.' };
+            }
+        } else { // Vertical
+            for (let r = minRow; r <= maxRow; r++) {
+                const coordStr = `${r}-${minCol}`;
+                const square = this.board[r][minCol];
+                lineCoords.push({ r, c: minCol });
+                if (!square.tile && !placedCoords.has(coordStr)) return { valid: false, error: 'Gap found in vertical placement.' };
+            }
+        }
+
+        // Check connectivity
         let isConnected = false; let touchesCenter = false;
-         for (const tile of move) { /* Check connectivity to existing tiles or center */
+        for (const tile of move) {
             const { row, col } = tile;
-             if (row === 7 && col === 7) touchesCenter = true;
-             const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-             for (const [dr, dc] of neighbors) {
-                  const nr = row + dr; const nc = col + dc;
-                  if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && this.board[nr][nc].tile !== null) { isConnected = true; break; }
-              }
-              if (isConnected) break;
-         }
-        if (this.isFirstMove) { if (!touchesCenter) return { valid: false, error: 'First move must cover the center square.' }; }
-        else { if (!isConnected && move.length > 0) return { valid: false, error: 'Move must connect to existing tiles.' }; }
+            if (this.board[row][col].isCenter) touchesCenter = true;
+            const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            for (const [dr, dc] of neighbors) {
+                const nr = row + dr; const nc = col + dc;
+                if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                    // Must connect to a tile already *on the board* (not part of current move)
+                    if (this.board[nr][nc].tile !== null) {
+                        isConnected = true;
+                        break; // Found connection for this tile
+                    }
+                }
+            }
+            if (isConnected && !this.isFirstMove) break; // Stop checking once connected (unless first move)
+        }
+
+        if (this.isFirstMove) {
+            if (!touchesCenter) return { valid: false, error: 'First move must cover the center square.' };
+            if (move.length < 2 && BOARD_SIZE > 1) return { valid: false, error: 'First move must be at least two letters long.' }; // Allow single tile if board is 1x1? No.
+        } else { // Not first move
+            if (!isConnected && move.length > 0) return { valid: false, error: 'Move must connect to existing tiles.' };
+        }
         return { valid: true, orientation, lineCoords };
     }
 
     _findFormedWords(move, orientation, lineCoords) {
-        // ... (Keep existing _findFormedWords implementation) ...
-         const wordsData = []; const tempBoard = _.cloneDeep(this.board);
-         for (const tile of move) { tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.isBlank ? 0 : TILE_DISTRIBUTION[tile.letter.toUpperCase()]?.value ?? 0 }; }
-         const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`));
-         const checkWord = (tileCoords, axis) => { /* ... logic to find word bounds, build word, check dict, add to wordsData if valid ... */
-             if (!tileCoords || tileCoords.length === 0) return; let start, end, fixedCoord;
-             if (axis === 'H') { fixedCoord = tileCoords[0].r; start = tileCoords[0].c; while (start > 0 && tempBoard[fixedCoord][start - 1].tile) start--; end = tileCoords[tileCoords.length - 1].c; while (end < BOARD_SIZE - 1 && tempBoard[fixedCoord][end + 1].tile) end++; }
-             else { fixedCoord = tileCoords[0].c; start = tileCoords[0].r; while (start > 0 && tempBoard[start - 1][fixedCoord].tile) start--; end = tileCoords[tileCoords.length - 1].r; while (end < BOARD_SIZE - 1 && tempBoard[end + 1][fixedCoord].tile) end++; }
-             if (end - start === 0 && move.length > 1 && tileCoords.length === 1) return; // Avoid single-letter cross words unless move is single tile
-             let word = ''; const wordTiles = [];
-             for (let i = start; i <= end; i++) {
-                 const r = (axis === 'H') ? fixedCoord : i; const c = (axis === 'H') ? i : fixedCoord;
-                 const square = tempBoard[r][c]; if (!square || !square.tile) continue;
-                 word += square.tile.letter;
-                 wordTiles.push({ ...square.tile, r, c, premium: this.board[r][c].premium, isPremiumUsed: this.board[r][c].isPremiumUsed, isNew: moveCoordsSet.has(`${r}-${c}`) });
+        // Finds main word and cross words, validates against dictionary.
+        const wordsData = [];
+        const tempBoard = _.cloneDeep(this.board);
+        const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`));
+
+        // Place move tiles onto temp board for easy lookup
+        for (const tile of move) {
+             // Use the tile's actual letter (could be assigned blank), value doesn't matter for finding words
+             tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value };
+        }
+
+        // Helper to get word details along an axis from a starting point
+        const checkWord = (startTileCoord, axis) => {
+             let currentWord = '';
+             const currentWordTiles = [];
+             let r = startTileCoord.r;
+             let c = startTileCoord.c;
+
+             // Find beginning of the word
+             if (axis === 'H') { while (c > 0 && tempBoard[r][c - 1]?.tile) c--; }
+             else { while (r > 0 && tempBoard[r - 1]?.[c]?.tile) r--; }
+
+             // Read the word tile by tile
+             while (r < BOARD_SIZE && c < BOARD_SIZE && tempBoard[r]?.[c]?.tile) {
+                 const currentSquare = tempBoard[r][c];
+                 const originalSquare = this.board[r][c]; // Use original for premium info
+                 currentWord += currentSquare.tile.letter;
+                 currentWordTiles.push({
+                     letter: currentSquare.tile.letter,
+                     value: originalSquare.tile ? originalSquare.tile.value : TILE_DISTRIBUTION[currentSquare.tile.letter]?.value ?? 0, // Get original value if exists, else lookup
+                     r, c,
+                     premium: originalSquare.premium,
+                     isPremiumUsed: originalSquare.isPremiumUsed,
+                     isNew: moveCoordsSet.has(`${r}-${c}`) // Is this tile part of the current move?
+                 });
+                 if (axis === 'H') c++; else r++;
              }
-             if (word.length > 1) {
-                 if (!dictionary.isValidWord(word)) { throw new Error(`Invalid word formed: ${word}`); }
-                 if (!wordsData.some(wd => wd.word === word && JSON.stringify(wd.tiles.map(t=>`${t.r}-${t.c}`)) === JSON.stringify(wordTiles.map(t=>`${t.r}-${t.c}`)))) { wordsData.push({ word, tiles: wordTiles }); } // Avoid duplicates based on coordinates
+
+             // Validate and store if it's a valid word (>1 letter)
+             if (currentWord.length > 1) {
+                 if (!dictionary.isValidWord(currentWord)) {
+                     throw new Error(`Invalid word formed: ${currentWord}`); // Throw error
+                 }
+                 // Prevent adding duplicate words based on tiles involved
+                 const wordKey = currentWord + '-' + currentWordTiles.map(t => `${t.r},${t.c}`).join('|');
+                 if (!wordsData.some(wd => wd.key === wordKey)) {
+                     wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
+                 }
              }
          };
-         try {
-              if (orientation === 'H' || orientation === 'V') checkWord(lineCoords, orientation);
-              else checkWord(lineCoords, 'H'); checkWord(lineCoords, 'V'); // Check both for single
-              const crossAxis = (orientation === 'H') ? 'V' : 'H';
-              for (const tile of move) { if (orientation !== 'single') checkWord([{ r: tile.row, c: tile.col }], crossAxis); }
-         } catch (error) { console.error(`Word validation error: ${error.message}`); return { valid: false, error: error.message }; }
-         if (this.isFirstMove && wordsData.length === 0 && move.length > 0) { return { valid: false, error: 'First move must form a valid word.' };} // Require word on first move
-         return { valid: true, wordsData };
+
+        try {
+             // Check the main word along the placement axis (start from first tile placed)
+             checkWord(move[0], orientation);
+
+             // Check cross words (perpendicular axis) for each tile placed
+             const crossAxis = (orientation === 'H') ? 'V' : 'H';
+             // Only check cross words if the main word was > 1 tile OR it was a single tile placement
+             if (orientation === 'single' || (lineCoords && lineCoords.length > 1)) {
+                  for (const tile of move) {
+                       checkWord({ r: tile.row, c: tile.col }, crossAxis);
+                  }
+             }
+        } catch (error) {
+             console.error(`Word validation error in game ${this.gameId}: ${error.message}`);
+             return { valid: false, error: error.message };
+        }
+
+        // Final check: A valid move must result in at least one word being added to wordsData
+        if (wordsData.length === 0 && move.length > 0) {
+             console.warn(`GameState ${this.gameId}: Move validly placed but formed no words? Review logic.`);
+             // This might indicate only single letters were added adjacently without forming new words > 1 length
+             // Generally considered invalid.
+             return { valid: false, error: 'Move must form at least one word of length 2 or more.' };
+        }
+
+        return { valid: true, wordsData };
     }
 
 
     _calculateScore(move, wordsData) {
-        // ... (Keep existing _calculateScore implementation) ...
-        let totalScore = 0; const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`));
-         for (const { word, tiles } of wordsData) {
-             let currentWordScore = 0; let wordMultiplier = 1;
-             for (const tile of tiles) {
-                 let letterScore = tile.value;
-                 if (tile.isNew && !tile.isPremiumUsed) { // Apply premiums only if tile is new and premium wasn't used before
-                     switch (tile.premium) {
-                         case 'DL': letterScore *= 2; break;
-                         case 'TL': letterScore *= 3; break;
-                         case 'DW': wordMultiplier *= 2; break;
-                         case 'TW': wordMultiplier *= 3; break;
-                     }
-                     // Handle center square bonus explicitly if needed (e.g., if it acts as DW always)
-                     if (tile.r === 7 && tile.c === 7 && this.isFirstMove) {
-                          // Default Scrabble center is DW
-                           wordMultiplier *= 2;
-                     }
-                 }
+        // Calculates score considering premiums and bingo.
+        let totalScore = 0;
+        for (const { word, tiles } of wordsData) {
+            let currentWordScore = 0;
+            let wordMultiplier = 1;
+            for (const tile of tiles) {
+                let letterScore = tile.value; // Use value from tile object (0 for blank)
+                // Apply premiums only if tile is NEW (part of current move)
+                if (tile.isNew) {
+                    const originalSquare = this.board[tile.r][tile.c]; // Check original board state
+                    // Apply only if premium is fresh (wasn't used before this move)
+                    if (!originalSquare.isPremiumUsed) {
+                        switch (originalSquare.premium) {
+                            case 'DL': letterScore *= 2; break;
+                            case 'TL': letterScore *= 3; break;
+                            case 'DW': wordMultiplier *= 2; break;
+                            case 'TW': wordMultiplier *= 3; break;
+                        }
+                        // Center square counts as DW on first move only
+                        if (originalSquare.isCenter && this.isFirstMove) {
+                            wordMultiplier *= 2;
+                        }
+                    }
+                }
                  currentWordScore += letterScore;
              }
              totalScore += (currentWordScore * wordMultiplier);
-         }
-         let bingoBonus = 0;
-         if (move.length === RACK_SIZE) { bingoBonus = 50; totalScore += bingoBonus; console.log(`GameState ${this.gameId}: Bingo! +50 points.`); }
-         return { score: totalScore, bingoBonus };
+        }
+        let bingoBonus = 0;
+        if (move.length === RACK_SIZE) {
+            bingoBonus = 50;
+            totalScore += bingoBonus;
+            console.log(`GameState ${this.gameId}: Bingo! +50 points.`);
+        }
+        return { score: totalScore, bingoBonus };
     }
 
     _checkGameOver(lastPlayer) {
+        // Game ends if bag is empty AND one player has used all their tiles
         if (this.tileBag.length === 0 && lastPlayer?.rack.length === 0) {
-            this._endGame('tiles');
+            this._endGame('tiles'); // End game, calculate final scores
             return { isOver: true, reason: 'tiles' };
         }
+        // Pass condition handled in passTurn
         return { isOver: false };
     }
 
     _endGame(reason) {
-         if (this.status === 'finished') return;
+         if (this.status === 'finished') return; // Prevent ending twice
          this.status = 'finished';
          console.log(`GameState ${this.gameId}: Game finished. Reason: ${reason}`);
          let scoreSumOfRacks = 0; let playerWhoFinished = null;
-         if (reason === 'tiles') playerWhoFinished = this.players.find(p => p.rack.length === 0);
+
+         if (reason === 'tiles') { // Player finished by using last tile
+             playerWhoFinished = this.players.find(p => p.rack.length === 0);
+         }
+
+         // Adjust scores based on remaining tiles
          for (const player of this.players) {
              const rackValue = player.rack.reduce((sum, tile) => sum + tile.value, 0);
-             if (player.rack.length > 0) { player.score -= rackValue; scoreSumOfRacks += rackValue; }
+             if (player.rack.length > 0) {
+                 player.score -= rackValue; // Subtract remaining tile values from own score
+                 scoreSumOfRacks += rackValue; // Add to sum for the player who finished (if applicable)
+                 console.log(`GameState ${this.gameId}: Player ${player.username} loses ${rackValue} points for remaining tiles.`);
+             }
          }
-         if (playerWhoFinished) playerWhoFinished.score += scoreSumOfRacks;
-         this.finalScores = this.players.map(p => ({ id: p.id, username: p.username, finalScore: p.score }));
-         console.log(`GameState ${this.gameId}: Final scores calculated:`, this.finalScores);
+
+         // Add sum to player who finished, if game ended by tiles
+         if (playerWhoFinished) {
+             playerWhoFinished.score += scoreSumOfRacks;
+             console.log(`GameState ${this.gameId}: Player ${playerWhoFinished.username} gains ${scoreSumOfRacks} points for finishing.`);
+         }
+
+         // Store final calculated scores, sorted descending
+         this.finalScores = this.players.map(p => ({
+             id: p.id,
+             username: p.username,
+             finalScore: p.score // The final, adjusted score
+         })).sort((a, b) => b.finalScore - a.finalScore);
+
+         console.log(`GameState ${this.gameId}: Final scores calculated:`, JSON.stringify(this.finalScores));
+         // Ensure no player has the turn anymore
+         this.players.forEach(p => p.isTurn = false);
+         this.currentTurnIndex = -1; // No current turn
     }
 
 
     // --- State Serialization ---
-
     getPublicState() {
+        // Returns state safe for all players (hides opponent racks)
         return {
             gameId: this.gameId,
-            players: this.players.map(p => ({ id: p.id, username: p.username, score: p.score, rackTileCount: p.rack.length, isTurn: p.isTurn })),
-            board: this.board,
+            players: this.players.map(p => ({
+                id: p.id,
+                username: p.username,
+                score: p.score,
+                rackTileCount: p.rack.length, // Don't send actual tiles
+                isTurn: p.isTurn
+            })),
+            board: this.board, // Send full board state (tiles, premiums, used status)
             tilesRemaining: this.tileBag.length,
-            currentTurnPlayerId: this.players[this.currentTurnIndex]?.id,
+            currentTurnPlayerId: this.currentTurnIndex >= 0 && this.players[this.currentTurnIndex] ? this.players[this.currentTurnIndex].id : null,
             status: this.status,
-            lastMove: this.lastMove,
+            lastMove: this.lastMove, // Include details of the last move for display
             consecutivePasses: this.consecutivePasses,
-            finalScores: this.finalScores
+            finalScores: this.finalScores // Include final scores if game is finished
         };
     }
 
     getPlayerSpecificState(playerId) {
+        // Returns state tailored for one player (includes their rack)
         const publicState = this.getPublicState();
         const player = this.players.find(p => p.id === playerId);
-        return { ...publicState, myRack: player ? player.rack : [] };
+        return {
+            ...publicState,
+            // Ensure rack is always an array, return a copy
+            myRack: player ? [...(player.rack || [])] : []
+        };
     }
-}
+} // End of GameState Class
+
+// Helper for connectivity check (could be moved to gameLogic)
+function isConnected(board, r, c) {
+     const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+     for (const [dr, dc] of neighbors) {
+         const nr = r + dr; const nc = c + dc;
+         if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr]?.[nc]?.tile !== null) {
+             return true;
+         }
+     }
+     return false;
+ }
+
 
 module.exports = GameState;

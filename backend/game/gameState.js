@@ -627,6 +627,6 @@ class GameState {
             myRack: player ? [...(player.rack || [])] : []
         };
     }
-} 
-// End of GameState Class
+} // End of GameState Class
+
 module.exports = GameState;

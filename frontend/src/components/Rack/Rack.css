@@ -1,0 +1,86 @@
+/* frontend/src/components/Rack/Rack.css */
+
+.player-rack {
+    background-color: #8b4513; /* Wood-like color */
+    padding: 10px 15px; /* More padding horizontally */
+    border-radius: 8px;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4); /* Deeper inset shadow */
+    margin-top: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+    border: 2px solid #5a2d0c; /* Darker wood border */
+    min-height: calc(var(--tile-size, 45px) + 24px); /* Ensure height based on tile size + padding */
+    transition: background-color 0.2s ease; /* For drag over effect */
+}
+
+/* Visual feedback when dragging over the rack area */
+.player-rack.drag-over {
+    background-color: #a0522d; /* Slightly lighter brown */
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.player-rack h3 {
+    color: #f0e68c; /* Khaki/Light gold */
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5); /* Subtle text shadow */
+}
+
+.rack-tiles {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px; /* Space between tiles/slots */
+}
+
+.rack-slot {
+    /* Make slot slightly larger than tile for visual spacing */
+    width: calc(var(--tile-size, 45px) + 4px);
+    height: calc(var(--tile-size, 45px) + 4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px; /* Rounded corners for slots */
+    transition: background-color 0.2s ease, border 0.2s ease; /* Smooth transitions */
+}
+
+/* Style for empty slots (placeholders or when tile is on board) */
+.empty-slot {
+    width: calc(var(--tile-size, 45px) - 2px); /* Slightly smaller than tile */
+    height: calc(var(--tile-size, 45px) - 2px);
+    background-color: rgba(0, 0, 0, 0.25); /* Darker indentation */
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Faint border */
+}
+
+/* Style when a tile temporarily placed on board occupies this slot */
+.rack-slot.slot-occupied-temp .empty-slot {
+    background-color: rgba(200, 200, 200, 0.1); /* Very faint indication */
+    border-style: dashed;
+}
+
+/* Style for slots whose tile is selected for exchange */
+.rack-slot.slot-selected-exchange {
+    background-color: rgba(75, 181, 67, 0.3); /* Light green semi-transparent */
+    border: 1px dashed #4CAF50; /* Green dashed border */
+}
+
+/* Indicate that tiles in selectable slots can be clicked */
+.rack-slot.selectable {
+    cursor: pointer; /* Hand cursor */
+}
+
+/* Adjust tile positioning within the slot slightly if needed */
+.rack-slot .tile {
+   /* Example: Slightly adjust margin if tile looks off-center */
+   /* margin: 1px; */
+}
+
+/* Add styles for the tile-selected-exchange class if not already in Tile.css */
+/* This could be a border, background change, or opacity adjustment */
+/* .tile.tile-selected-exchange { */
+    /* border: 2px solid #4CAF50; */
+    /* opacity: 0.7; */
+/* } */

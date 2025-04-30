@@ -22,23 +22,48 @@ export function useGameManager(socket, myPlayerId) {
 
         // Define handlers within the effect's scope
         const handleGameUpdate = (newGameState) => {
-            console.log("useGameManager received gameUpdate:", newGameState);
-            if (!newGameState || !newGameState.gameId || !Array.isArray(newGameState.players)) {
-                console.error("Invalid gameUpdate structure:", newGameState);
-                setLastGameError("Received invalid data from server (update).");
-                return;
+            // Log the raw data received for debugging
+            console.log("useGameManager received gameUpdate payload:", newGameState);
+
+            // --- Data Validation ---
+            // Ensure the received data looks like a minimal game state object
+            if (!newGameState || typeof newGameState !== 'object' || !newGameState.gameId || !Array.isArray(newGameState.players)) {
+                console.error("useGameManager received invalid gameUpdate structure:", newGameState);
+                // Set an error state that can be displayed in the UI
+                setLastGameError("Received invalid game data from server.");
+                return; // Stop processing this invalid update
             }
-            setGameState(newGameState); // Update the main game state
-            // Update local rack ONLY if this update specifically contains it
+
+            // --- Update Core Game State ---
+            // Always update the main gameState with the latest received state
+            setGameState(newGameState);
+            console.log(`useGameManager: Updated main gameState for game ${newGameState.gameId}`);
+
+            // --- Update Player's Specific Rack (Conditional) ---
+            // Check if this specific update payload includes the 'myRack' field
+            // AND that it's a valid array. This indicates it's a specific update
+            // meant for this player (e.g., after their own move/exchange, or game start).
             if (newGameState.myRack && Array.isArray(newGameState.myRack)) {
+                 console.log(`useGameManager: Found 'myRack' in gameUpdate for player ${myPlayerId}. Updating local rack state.`);
+                 console.log("  New myRack data received:", JSON.stringify(newGameState.myRack));
+                 // ---> Update the local myRack state <---
                  setMyRack(newGameState.myRack);
-                 console.log("useGameManager: Updated local rack from gameUpdate.");
+            } else {
+                // This is expected for public updates received after an opponent's move.
+                // Do NOT update myRack in this case, as the public state doesn't contain it.
+                console.log(`useGameManager: No specific 'myRack' found in gameUpdate for player ${myPlayerId}. Local rack preserved.`);
             }
-            // Update game ID for sharing if available
-            if (newGameState.gameId) setGameIdToShare(newGameState.gameId);
-             // Clear errors on a successful update
+
+            // --- Update Other Relevant State ---
+            // Update the game ID used for sharing links/display
+            if (newGameState.gameId) {
+                setGameIdToShare(newGameState.gameId);
+            }
+
+            // Clear any previous non-fatal game errors now that we received a valid update
             setLastGameError('');
         };
+
 
         const handleGameJoined = (playerSpecificState) => {
              console.log("useGameManager received gameJoined:", playerSpecificState);

@@ -113,6 +113,9 @@ io.on('connection', (socket) => {
 
       // --- Exchange Tiles Handler --- (Keep as is - sends specific then public)
       socket.on('exchangeTiles', (data) => {
+        const { gameId, tiles } = data || {};
+         console.log(`Received 'exchangeTiles' from ${playerId} for ${gameId} with tiles: ${tiles?.join(',')}`);
+         if (!gameId || !Array.isArray(tiles) || tiles.length === 0) { return socket.emit('gameError', { message: 'Invalid exchange data.' }); }
         // ... (validation) ...
          try {
             const gameState = gameManager.getGameState(gameId);

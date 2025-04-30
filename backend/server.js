@@ -163,8 +163,7 @@ io.on('connection', (socket) => {
             else { console.log(`Player ${playerId} disconnected, was not in active game.`); }
         } catch(err) { console.error(`Error processing disconnect for ${playerId}:`, err); }
     }); // ---> End of disconnect handler
-
-}); // ---> End of io.on('connection')
+ // ---> End of io.on('connection')
 
 // Start the server
 server.listen(PORT, () => {

@@ -3,10 +3,13 @@ import React from 'react';
 import Tile from '../Tile/Tile'; // Import Tile component
 import './Rack.css'; // Ensure this CSS file exists and is styled
 
+// Define RACK_SIZE constant locally if not imported
+const RACK_SIZE = 7;
+
 /**
  * Displays the player's tile rack and handles selection for exchange.
  * @param {object} props
- * @param {Array} props.tiles - Array of tile objects [{letter, value}] in the rack.
+ * @param {Array} props.tiles - Array of tile objects [{letter, value}] received from App state.
  * @param {Array} [props.temporarilyPlacedIndices=[]] - Indices of rack tiles currently placed on the board.
  * @param {Function} props.onRackDrop - Callback function when a tile is dropped back onto the rack area.
  * @param {boolean} props.canInteract - Whether the player can currently interact (drag/select) with the rack.
@@ -21,112 +24,72 @@ const Rack = ({
     selectedForExchange = [], // Expects array of originalIndex numbers
     onTileSelect,
 }) => {
-    // Ensure tiles is always an array, even if null/undefined is passed initially
+    // Ensure tiles is always an array
     const playerTiles = Array.isArray(tiles) ? tiles : [];
 
     // Create display tiles array, marking placed and selected status based on indices
     const displayTiles = playerTiles.map((tile, index) => ({
-        ...tile,
-        originalIndex: index, // Store the original index before placeholders are added
+        ...tile, // tile object should be { letter: 'A', value: 1 }
+        originalIndex: index, // Store the original index before placeholders
         isPlaced: temporarilyPlacedIndices.includes(index), // Is this tile currently on the board temp?
         isSelected: selectedForExchange.includes(index), // Is this tile currently selected for exchange?
     }));
 
     // Add placeholder objects for visual consistency if rack has fewer than 7 tiles
-    const placeholdersNeeded = RACK_SIZE - displayTiles.length; // Use RACK_SIZE constant if available, else 7
+    const placeholdersNeeded = RACK_SIZE - displayTiles.length;
     for (let i = 0; i < placeholdersNeeded; i++) {
         displayTiles.push({ isPlaceholder: true, key: `placeholder-${i}` });
     }
 
-    // --- Drop Handling: For tiles dragged back from the board ---
+    // --- Drop Handling ---
     const handleDrop = (e) => {
-        if (!canInteract || !onRackDrop) return; // Check if interaction allowed and handler exists
-        e.preventDefault();
-        e.currentTarget.classList.remove('drag-over'); // Remove visual feedback
+        if (!canInteract || !onRackDrop) return;
+        e.preventDefault(); e.currentTarget.classList.remove('drag-over');
         const tileDataString = e.dataTransfer.getData("application/json");
         if (tileDataString) {
             try {
                 const tileData = JSON.parse(tileDataString);
-                // Only handle drops originating from the board (returning a temp tile)
-                if (tileData.originData?.type === 'board') {
-                    console.log("Rack: Tile dropped back onto rack:", tileData);
-                    onRackDrop(tileData); // Call handler passed from App
-                } else {
-                     console.log("Rack: Tile dropped originated from rack, ignoring drop on rack itself.");
-                }
-            } catch (error) {
-                console.error("Rack: Failed to parse dropped tile data:", error);
-            }
+                if (tileData.originData?.type === 'board') { onRackDrop(tileData); }
+                 else { console.log("Rack: Tile dropped originated from rack, ignoring drop on rack itself."); }
+            } catch (error) { console.error("Rack: Failed to parse dropped tile data:", error); }
         }
     };
-
-    // Add visual feedback when dragging over rack area
-    const handleDragOver = (e) => {
-        if (!canInteract) return;
-        // Allow drop only if a tile is dragged over
-        e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
-    };
-
-    const handleDragLeave = (e) => {
-        e.currentTarget.classList.remove('drag-over');
-    };
+    const handleDragOver = (e) => { if (!canInteract) return; e.preventDefault(); e.currentTarget.classList.add('drag-over'); };
+    const handleDragLeave = (e) => { e.currentTarget.classList.remove('drag-over'); };
 
     // --- Tile Click Handler for Exchange Selection ---
     const handleTileClick = (tileInfo) => {
-        // Allow selection only if:
-        // - Interaction is generally allowed (player's turn, connected etc.)
-        // - It's a real tile (not a placeholder)
-        // - The tile is not already placed on the board
-        // - The onTileSelect callback function is provided
         if (canInteract && tileInfo && !tileInfo.isPlaceholder && !tileInfo.isPlaced && onTileSelect) {
              console.log("Rack: Tile clicked for selection - index:", tileInfo.originalIndex);
              onTileSelect(tileInfo.originalIndex); // Pass the original index back to App
         } else if (tileInfo?.isPlaced) {
              console.log("Rack: Cannot select tile already placed on board.");
-             // Optionally provide feedback to user (e.g., brief message)
         }
     };
 
     return (
-        <div
-            className="player-rack"
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            title="Your tile rack"
-        >
+        <div className="player-rack" onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} title="Your tile rack">
             <h3>Your Rack</h3>
             <div className="rack-tiles">
                 {displayTiles.map((tileInfo) => (
                     <div
-                       // Use a consistent key based on whether it's a real tile or placeholder
                        key={tileInfo.isPlaceholder ? tileInfo.key : `slot-${tileInfo.originalIndex}`}
-                       className={`
-                            rack-slot
-                            ${tileInfo?.isPlaced ? 'slot-occupied-temp' : ''}
-                            ${tileInfo?.isSelected ? 'slot-selected-exchange' : ''}
-                            ${canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? 'selectable' : ''}
-                       `}
-                       // Attach the click handler for selection
+                       className={`rack-slot ${tileInfo?.isPlaced ? 'slot-occupied-temp' : ''} ${tileInfo?.isSelected ? 'slot-selected-exchange' : ''} ${canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? 'selectable' : ''}`}
                        onClick={() => handleTileClick(tileInfo)}
                        title={canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? "Click to select/deselect for exchange" : (tileInfo?.isPlaced ? "Tile on board" : "")}
                     >
-                        {/* Render Tile only if it's a real tile AND not currently placed on board */}
+                        {/* --->>> Render Tile if it's real and not on board <<<--- */}
                         {tileInfo && !tileInfo.isPlaceholder && !tileInfo.isPlaced ? (
                             <Tile
-                                letter={tileInfo.letter}
-                                value={tileInfo.value}
-                                // Allow dragging only if interaction allowed AND tile NOT selected for exchange
-                                isDraggable={canInteract && !tileInfo.isSelected}
-                                id={`rack-tile-${tileInfo.originalIndex}`} // Unique ID based on original position
-                                originData={{ type: 'rack', index: tileInfo.originalIndex }} // Identify source
-                                // Pass selection state for visual feedback within Tile component
-                                isSelected={tileInfo.isSelected}
+                                letter={tileInfo.letter} // Pass letter
+                                value={tileInfo.value}   // Pass value
+                                isDraggable={canInteract && !tileInfo.isSelected} // Prevent dragging selected tiles
+                                id={`rack-tile-${tileInfo.originalIndex}`}
+                                originData={{ type: 'rack', index: tileInfo.originalIndex }}
+                                isSelected={tileInfo.isSelected} // Pass selection state
                             />
                         ) : (
-                            // Show empty slot if it's a placeholder OR if the tile is placed on board
-                            <div className="empty-slot"></div>
+                            <div className="empty-slot"></div> // Placeholder
                         )}
                     </div>
                 ))}
@@ -134,8 +97,5 @@ const Rack = ({
         </div>
     );
 };
-
-// Define RACK_SIZE constant if not imported from elsewhere
-const RACK_SIZE = 7;
 
 export default Rack;

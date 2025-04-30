@@ -28,7 +28,7 @@ function handleJoinRequest(playerId, username, targetGameId = null) {
              if (targetGameId && targetGameId !== existingGameId) {
                  return { error: `You are already in game ${existingGameId}. Leave that game first.` };
              }
-            // Return existing state (they might have refreshed)
+            // Allow rejoining same game (e.g., after refresh) - return existing state
             return { gameId: existingGameId, gameState: activeGames.get(existingGameId), gameJustStarted: false };
         } else {
             playerGameMap.delete(playerId); // Clean up stale map entry
@@ -130,7 +130,7 @@ function getGameState(gameId) {
  */
 function removePlayer(playerId) {
     const gameId = playerGameMap.get(playerId);
-    if (!gameId) { return null; }
+    if (!gameId) { return null; } // Player not found in map
 
     const gameState = activeGames.get(gameId);
     playerGameMap.delete(playerId); // Remove mapping
@@ -163,6 +163,7 @@ function removePlayer(playerId) {
 
     // --- Handle Game State Changes ---
     if (gameState.players.length === 0) {
+        // Game is empty, remove it
         console.log(`Game Manager: Game ${gameId} is now empty, removing game.`);
         activeGames.delete(gameId);
         return { gameId, wasGameRemoved: true, remainingPlayers: [], notifyOthers: false, updatedGameState: null, leavingPlayerUsername };
@@ -173,22 +174,21 @@ function removePlayer(playerId) {
              const oldTurnIndex = gameState.currentTurnIndex;
              if (wasCurrentTurn) {
                  // If the leaving player had the turn, the next player gets it
-                 gameState.currentTurnIndex %= gameState.players.length;
+                 gameState.currentTurnIndex %= gameState.players.length; // Modulo handles wrap-around after splice
                  if(gameState.players[gameState.currentTurnIndex]) gameState.players[gameState.currentTurnIndex].isTurn = true;
                  console.log(`Game Manager: Player ${leavingPlayerUsername} left on turn. New turn: ${gameState.players[gameState.currentTurnIndex]?.username}.`);
              } else {
                  // If leaver was *before* the current turn player, the current index shifts down
-                 if (playerIndex < oldTurnIndex) {
-                     gameState.currentTurnIndex = (oldTurnIndex - 1 + gameState.players.length) % gameState.players.length; // Adjust index safely
-                 } else {
-                     // Index is correct or needs modulo if last player left
-                      gameState.currentTurnIndex %= gameState.players.length;
-                 }
-                  // Ensure the correct player has isTurn=true
-                  if(gameState.players.length > 0 && gameState.currentTurnIndex >= 0) {
+                 // Ensure index remains valid after potential shift
+                 if (playerIndex < oldTurnIndex) gameState.currentTurnIndex = (oldTurnIndex - 1 + gameState.players.length) % gameState.players.length;
+                 else gameState.currentTurnIndex %= gameState.players.length;
+
+                 // Ensure the correct player has isTurn=true
+                  if(gameState.players.length > 0 && gameState.currentTurnIndex >= 0 && gameState.players[gameState.currentTurnIndex]) {
                     gameState.players.forEach((p, idx) => p.isTurn = (idx === gameState.currentTurnIndex));
-                  } else {
-                       gameState.currentTurnIndex = -1; // Safety reset if index becomes invalid
+                  } else { // Fallback if index is somehow invalid
+                     gameState.currentTurnIndex = 0;
+                     if(gameState.players.length > 0 && gameState.players[0]) gameState.players[0].isTurn = true;
                   }
              }
 
@@ -217,8 +217,6 @@ function removePlayer(playerId) {
 module.exports = {
     handleJoinRequest,
     getGameState,
-    // maybeStartGame is now effectively inside handleJoinRequest
+    // maybeStartGame, // Removed as start logic moved into handleJoinRequest
     removePlayer,
-    // Expose activeGames map only if needed for debugging/admin, generally avoid
-    // activeGames
 };

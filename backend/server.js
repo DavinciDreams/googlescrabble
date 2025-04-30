@@ -16,7 +16,9 @@ const server = http.createServer(app);
 // Setup Socket.IO Server
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "*", // Use env var for frontend URL in prod, wildcard for dev
+        // Use environment variable for production frontend URL
+        // Allow wildcard locally or if env var not set
+        origin: process.env.FRONTEND_URL || "*",
         methods: ["GET", "POST"]
     },
     // Optional: Configure ping settings for connection stability
@@ -26,7 +28,7 @@ const io = new Server(server, {
 
 // Basic HTTP route for health checks/info
 app.get('/', (req, res) => {
-    res.send(`Scrabble Server is running!`);
+    res.send(`Scrabble Server is running!`); // Avoid exposing internal state like activeGames count here
 });
 
 // Main Socket.IO Connection Logic
@@ -48,25 +50,25 @@ io.on('connection', (socket) => {
 
         try {
             // Use the gameManager function, check if game started
-            // gameJustStarted flag is important here
             const { gameId, gameState, error, gameJustStarted } = gameManager.handleJoinRequest(playerId, username, targetGameId);
 
             // Handle error or success
             if (error || !gameId || !gameState) {
                 console.error(`Failed to process joinGame for ${playerId}: ${error || 'Unknown reason'}`);
-                return socket.emit('gameError', { message: error || 'Failed to join or create game.' }); // Send error back
+                // Send specific error back to the user
+                return socket.emit('gameError', { message: error || 'Failed to join or create game.' });
             }
 
             // Success - Join room and emit initial state to joining player
             console.log(`Player ${playerId} joining room ${gameId}`);
             socket.join(gameId);
 
-            // ---> Send state (includes rack if game just started) via gameJoined <---
+            // Send specific state (potentially including dealt rack if game just started)
             const playerSpecificState = gameState.getPlayerSpecificState(playerId);
             console.log(`Emitting 'gameJoined' to ${playerId}`);
             socket.emit('gameJoined', playerSpecificState);
 
-            // Notify other players in the room that someone joined
+            // Notify other players in the room
             const player = gameState.players.find(p => p.id === playerId);
             if (player) {
                  const playerPublicInfo = { playerId: player.id, username: player.username, score: player.score };
@@ -74,21 +76,16 @@ io.on('connection', (socket) => {
                  socket.to(gameId).emit('playerJoined', playerPublicInfo); // Use socket.to to exclude sender
             }
 
-            // --->>> If this join STARTED the game, send specific updates <<<---
+            // If this join action *caused* the game to start, emit specific updates to all
             if (gameJustStarted) {
-                console.log(`Server: Game ${gameId} started! Emitting initial gameUpdate to ALL players in room.`);
-
+                console.log(`Server: Game ${gameId} started! Emitting initial specific gameUpdates to ALL players.`);
                 // Iterate over all players IN THE GAME STATE and send them their specific state
                 gameState.players.forEach(p => {
                     const stateForThisPlayer = gameState.getPlayerSpecificState(p.id);
-                    // Emit directly to that player's socket ID
                     console.log(`   Sending specific gameUpdate to player ${p.username} (${p.id})`);
-                    io.to(p.id).emit('gameUpdate', stateForThisPlayer);
+                    io.to(p.id).emit('gameUpdate', stateForThisPlayer); // Target specific socket ID
                 });
-                // We no longer need the generic io.to(gameId).emit('gameUpdate', ...) here,
-                // because each player just received their specific state.
             }
-            // --->>> End game start update <<<---
 
         } catch (err) {
             console.error(`CRITICAL ERROR processing joinGame for ${playerId}:`, err);
@@ -105,11 +102,10 @@ io.on('connection', (socket) => {
             const gameState = gameManager.getGameState(gameId);
             if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
-            const result = gameState.placeValidMove(playerId, move);
+            const result = gameState.placeValidMove(playerId, move); // Delegate to GameState
             if (result.success) {
                 console.log(`Player ${playerId} placed move in game ${gameId}. Score: ${result.score}.`);
-                // Broadcast the updated public state to everyone
-                io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Public state is fine after move
+                io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Broadcast public state
                 if (result.gameOver) {
                      console.log(`Game ${gameId} ended. Reason: ${result.reason || 'tiles'}`);
                      io.to(gameId).emit('gameOver', { finalScores: result.finalScores, reason: result.reason || 'tiles' });
@@ -118,7 +114,7 @@ io.on('connection', (socket) => {
                 console.warn(`Invalid move by ${playerId} in game ${gameId}: ${result.error}`);
                 socket.emit('invalidMove', { message: result.error || 'Invalid move.' }); // Send only to player
             }
-        } catch (err) { console.error(/*...*/); socket.emit('gameError', { message: 'Internal server error processing move.' }); }
+        } catch (err) { console.error(`CRITICAL ERROR processing placeTiles for ${playerId}:`, err); socket.emit('gameError', { message: 'Internal server error processing move.' }); }
     });
 
     // --- Pass Turn Handler ---
@@ -130,7 +126,7 @@ io.on('connection', (socket) => {
             const gameState = gameManager.getGameState(gameId);
             if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
-            const result = gameState.passTurn(playerId);
+            const result = gameState.passTurn(playerId); // Delegate
             if (result.success) {
                 console.log(`Player ${playerId} passed turn in game ${gameId}.`);
                 io.to(gameId).emit('gameUpdate', gameState.getPublicState()); // Broadcast update
@@ -140,9 +136,9 @@ io.on('connection', (socket) => {
                  }
             } else {
                 console.warn(`Failed passTurn by ${playerId} in game ${gameId}: ${result.error}`);
-                socket.emit('gameError', { message: result.error || 'Cannot pass turn now.' });
+                socket.emit('gameError', { message: result.error || 'Cannot pass turn now.' }); // Send error back
             }
-        } catch (err) { console.error(/*...*/); socket.emit('gameError', { message: 'Internal server error processing pass.' }); }
+        } catch (err) { console.error(`CRITICAL ERROR processing passTurn for ${playerId}:`, err); socket.emit('gameError', { message: 'Internal server error processing pass.' }); }
     });
 
     // --- Exchange Tiles Handler ---
@@ -154,18 +150,18 @@ io.on('connection', (socket) => {
             const gameState = gameManager.getGameState(gameId);
             if (!gameState) return socket.emit('gameError', { message: `Game '${gameId}' not found.` });
             if (gameState.status !== 'playing') return socket.emit('gameError', { message: `Game is not active (${gameState.status}).` });
-            const result = gameState.exchangeTiles(playerId, tiles);
+            const result = gameState.exchangeTiles(playerId, tiles); // Delegate
             if (result.success) {
                 console.log(`Player ${playerId} exchanged tiles in game ${gameId}.`);
-                // Send specific update TO THE PLAYER containing their new rack
+                // Send specific update TO THE PLAYER with their new rack
                 socket.emit('gameUpdate', gameState.getPlayerSpecificState(playerId));
                 // Send general public update TO OTHERS in the room
                 socket.to(gameId).emit('gameUpdate', gameState.getPublicState());
             } else {
                  console.warn(`Failed exchangeTiles by ${playerId} in game ${gameId}: ${result.error}`);
-                 socket.emit('gameError', { message: result.error || 'Cannot exchange tiles now.' });
+                 socket.emit('gameError', { message: result.error || 'Cannot exchange tiles now.' }); // Send error back
             }
-         } catch (err) { console.error(/*...*/); socket.emit('gameError', { message: 'Internal server error processing exchange.' }); }
+         } catch (err) { console.error(`CRITICAL ERROR processing exchangeTiles for ${playerId}:`, err); socket.emit('gameError', { message: 'Internal server error processing exchange.' }); }
     });
 
     // --- Chat Message Handler ---
@@ -174,7 +170,7 @@ io.on('connection', (socket) => {
         if (!gameId || typeof message !== 'string' || message.trim().length === 0) { console.warn(`Invalid chat msg data from ${playerId}`); return; }
         const gameState = gameManager.getGameState(gameId);
         const sender = gameState?.players.find(p => p.id === playerId);
-        const senderUsername = sender ? sender.username : playerId.substring(0, 6);
+        const senderUsername = sender ? sender.username : playerId.substring(0, 6); // Fallback username
         const messageData = { senderId: playerId, senderUsername: senderUsername, text: message.trim().slice(0, 200) };
         console.log(`[${gameId}] Chat from ${senderUsername} (${playerId}): ${messageData.text}`);
         io.to(gameId).emit('newChatMessage', messageData); // Broadcast including sender
@@ -184,6 +180,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', (reason) => {
         console.log(`User disconnected: ${playerId}. Reason: ${reason}`);
         try {
+            // Use gameManager to handle player removal and get necessary info
             const removalInfo = gameManager.removePlayer(playerId);
             if (removalInfo && removalInfo.gameId && removalInfo.notifyOthers) {
                  const { gameId, updatedGameState, wasGameRemoved, leavingPlayerUsername } = removalInfo;

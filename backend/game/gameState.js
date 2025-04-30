@@ -1,4 +1,3 @@
-**Replace the entire content of your backend/game/gameState.js file with
 // backend/game/gameState.js
 const { TILE_DISTRIBUTION, BOARD_SIZE, RACK_SIZE, BOARD_LAYOUT, PREMIUM_MAP } = require('./constants');
 const dictionary = require('../utils/dictionary'); // Ensure this utility works

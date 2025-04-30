@@ -91,7 +91,9 @@ function App() {
          };
         const handleNewMessage = (message) => { setMessages(prev => [...prev, message]); };
         const handleInvalidMove = (error) => { console.warn("Invalid Move:", error.message); setLastGameError(`Invalid Move: ${error.message || '?'}`); setTemporaryPlacements([]); };
-        const handleError = (error) => { console.error("Game Error:", error.message); if (error.message?.includes('not found') || error.message?.includes('full') || error.message?.includes('already started') || error.message?.includes('Username may be taken')) { setJoinError(error.message); } else { setLastGameError(`Error: ${error.message || '?'}`); } };
+        const handleError = (error) => { console.error("Game Error:", error.message); 
+            if (error.message?.includes('not found') || error.message?.includes('full') || error.message?.includes('already started') || error.message?.includes('Username may be taken')) { setJoinError(error.message); } 
+            else { setLastGameError(`Error: ${error.message || '?'}`); } };
         const handlePlayerLeft = (leftPlayerInfo) => { console.log(/*...*/); setMessages(prev => [...prev, { system: true, text: `Player ${leftPlayerInfo.username || leftPlayerInfo.playerId.substring(0,6)} left.`}]); };
         const handleGameOver = (gameOverData) => { console.log(/*...*/); setGameState(prev => prev ? { ...prev, status: 'finished', finalScores: gameOverData.finalScores } : null); setTemporaryPlacements([]); setSelectedTilesForExchange([]); };
 
@@ -108,6 +110,7 @@ function App() {
              socketService.removeListener('playerLeft', handlePlayerLeft); socketService.onPlayerLeft(handlePlayerLeft);
              socketService.removeListener('gameOver', handleGameOver); socketService.onGameOver(handleGameOver);
              if (currentSocket.connected) { handleConnect(); } else { socketService.connect(); }
+             
         }
         // Cleanup Listeners
         return () => {
@@ -140,7 +143,10 @@ function App() {
                  <div className="join-form-container">
                      {/* Join Form JSX */}
                      <form onSubmit={handleJoinGame} className="join-form">
-                         {/* Input fields, button, error display */}
+                     <div className="form-group"> <label htmlFor="username">Username:</label> <input id="username" type="text" value={username} onChange={(e) => { setUsername(e.target.value); setJoinError(''); }} placeholder="Enter Username" maxLength="16" required /> </div>
+                         <div className="form-group"> <label htmlFor="gameIdInput">Game ID (Optional):</label> <input id="gameIdInput" type="text" value={joinGameId} onChange={(e) => setJoinGameId(e.target.value)} placeholder="Enter Game ID to join" /> </div>
+                         <button type="submit" disabled={!isConnected} onClick={() => console.log("DEBUG: Join Button Clicked!")} > {joinGameId.trim() ? 'Join Specific Game' : 'Join / Create Game'} </button>
+                         {joinError && <p className="error-message join-error">{joinError}</p>}
                      </form>
                  </div>
             ) : gameState ? (

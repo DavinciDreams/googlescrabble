@@ -51,8 +51,8 @@ this.lastMove = null;
 this.isFirstMove = true;
 this.finalScores = null;
 this.maxPlayers = 2; // Default max players (can be overridden if needed)
-console.log(GameState [${this.gameId}] created. Tile bag size: ${this.tileBag.length});
-}
+console.log(`GameState [${this.gameId}] created. Tile bag size: ${this.tileBag.length}`);
+//           ^                                                                       ^ // Use backticks ` `}
 // --- Player Management ---
 addPlayer(playerId, username) {
     console.log(`GameState [${this.gameId}]: Attempting to add player ${playerId} (${username}). Status: ${this.status}, Players: ${this.players.length}/${this.maxPlayers}`);

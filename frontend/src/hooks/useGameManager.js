@@ -114,6 +114,8 @@ export function useGameManager(socket, myPlayerId) {
         return cleanup;
 
     }, [socket, myPlayerId]); // Rerun effect if socket instance or player ID changes
+// Inside useGameManager hook, before the final return statement
+console.log(`useGameManager - Rendering - Current myRack State:`, JSON.stringify(myRack));
 
     // Return the state managed by this hook
     return {

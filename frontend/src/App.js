@@ -157,6 +157,7 @@ function App() {
 
     const copyGameIdToClipboard = useCallback(() => { /* ... same logic using setCopySuccess ... */ }, [gameIdToShare]);
 
+    console.log(`App Component - Rendering - myRack from hook:`, JSON.stringify(myRack));
 
     // --- Rendering Logic ---
     return (

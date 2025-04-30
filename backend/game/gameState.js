@@ -131,81 +131,123 @@ class GameState {
         return { success: true };
     }
 
-    placeValidMove(playerId, move) {
-        const turnCheck = this._checkTurn(playerId);
-        if (!turnCheck.valid) return { success: false, error: turnCheck.error };
-        const player = this.players[this.currentTurnIndex];
-        if (!player) return { success: false, error: 'Internal error: Current player not found.' };
-
-        // 1. Validate Rack
-        const neededTiles = {};
-        for (const tile of move) { const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter?.toUpperCase(); if (!requiredLetter) return { success: false, error: 'Move contains invalid tile letter.'}; neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1; }
-        const currentRack = {}; player.rack.forEach(t => { currentRack[t.letter] = (currentRack[t.letter] || 0) + 1; });
-        for (const letter in neededTiles) { if (!currentRack[letter] || currentRack[letter] < neededTiles[letter]) { console.warn(`Rack Validation FAIL: Player ${playerId} needs ${neededTiles[letter]} of ${letter}, but rack count is ${currentRack[letter] || 0}`); return { success: false, error: `You don't have enough '${letter}' tiles.` }; } }
-        console.log(`GameState [${this.gameId}]: Rack validation PASSED.`);
-
-        // 2. Validate Placement
-        const placementValidation = this._validatePlacement(move);
-        if (!placementValidation.valid) return { success: false, error: placementValidation.error };
-        const { orientation, lineCoords } = placementValidation;
-        console.log(`GameState [${this.gameId}]: Placement validation PASSED. Orientation: ${orientation}`);
-
-        // 3. Validate Words
-        const formedWordsResult = this._findFormedWords(move, orientation, lineCoords);
-        if (!formedWordsResult.valid) return { success: false, error: formedWordsResult.error };
-        const { wordsData } = formedWordsResult;
-        if (wordsData.length === 0 && move.length > 0) return { success: false, error: 'Move must form at least one word.' };
-        console.log(`GameState [${this.gameId}]: Word validation PASSED. Words: ${wordsData.map(w=>w.word).join(', ')}`);
-
-        // 4. Calculate Score
-        const scoreResult = this._calculateScore(move, wordsData);
-        const totalScore = scoreResult.score;
-        const bingoBonus = scoreResult.bingoBonus;
-        console.log(`GameState [${this.gameId}]: Score calculated: ${totalScore} (Bingo: ${bingoBonus})`);
-
-        // 5. Update State
-        const rackTilesToRemove = [];
-        const currentRackCopy = [...player.rack];
-        // a. Update board
-        for (const tile of move) {
-             const square = this.board[tile.row][tile.col];
-             const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase();
-             const rackTileIndex = currentRackCopy.findIndex(t => t.letter === requiredLetter);
-             if (rackTileIndex === -1) { console.error(`CRITICAL INTERNAL ERROR: Tile ${requiredLetter} not found in rack copy.`); return { success: false, error: `Internal error: Tile ${requiredLetter} not found.` }; }
-             const [rackTile] = currentRackCopy.splice(rackTileIndex, 1);
-             rackTilesToRemove.push(rackTile);
-             square.tile = { letter: tile.letter.toUpperCase(), value: rackTile.value };
-             // Mark premium used AFTER score calculation used original state
-             if (square.premium && !square.isPremiumUsed) {
-                 console.log(`   Marking premium ${square.premium} at (${tile.row},${tile.col}) as used.`);
-                 square.isPremiumUsed = true;
-             }
-        } // End of board update loop
-
-        // b. Update player score
-        player.score += totalScore;
-        // c. Remove used tiles from actual rack
-        player.rack = player.rack.filter(tile => !rackTilesToRemove.includes(tile));
-        // d. Draw new tiles
-        this.drawTiles(player, move.length);
-        // e. Update game state properties
-        this.consecutivePasses = 0; this.isFirstMove = false;
-        this.lastMove = { playerId, move: move.map(m=>({...m})), wordsData, score: totalScore, bingoBonus };
-        this.moveHistory.push(this.lastMove);
-
-        // 6. Advance Turn
-        this.advanceTurn();
-
-        // 7. Check Game Over
-        const gameOverInfo = this._checkGameOver(player);
-        if (gameOverInfo.isOver) {
-            console.log(`GameState [${this.gameId}]: Game ending after move by ${player.username}. Reason: ${gameOverInfo.reason}`);
-             return { success: true, score: totalScore, gameOver: true, finalScores: this.finalScores };
-        } else {
-            console.log(`GameState [${this.gameId}]: Player ${playerId} placed move. Score: ${totalScore}. New total: ${player.score}`);
-             return { success: true, score: totalScore, gameOver: false };
-        }
-    } // End placeValidMove
+        // --- placeValidMove with Added Rack Validation Logging ---
+        placeValidMove(playerId, move) {
+            const turnCheck = this._checkTurn(playerId);
+            if (!turnCheck.valid) return { success: false, error: turnCheck.error };
+            const player = this.players[this.currentTurnIndex];
+            if (!player) return { success: false, error: 'Internal error: Current player not found.' };
+    
+            // --- 1. Validate Tiles in Rack ---
+            console.log(`--- Rack Validation Start for Player ${playerId} [${this.gameId}] ---`);
+            console.log('Move Data Received:', JSON.stringify(move, null, 2)); // Pretty print move data
+            console.log('Server-Side Rack BEFORE Validation:', JSON.stringify(player.rack, null, 2)); // Pretty print current rack on server
+    
+            const neededTiles = {}; // Example: { 'A': 1, 'BLANK': 1 }
+            for (const tile of move) {
+                // Determine the required tile type from the rack (BLANK or specific letter)
+                const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter?.toUpperCase();
+                // Basic check if letter is valid
+                if (!requiredLetter) {
+                    console.error(`GameState [${this.gameId}]: Invalid move data - tile missing letter property:`, JSON.stringify(tile));
+                    return { success: false, error: 'Move contains invalid tile data (missing letter).' };
+                }
+                neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1;
+            }
+            console.log('Needed Tiles Count:', JSON.stringify(neededTiles));
+    
+            // Count tiles currently in the player's rack on the server
+            const currentRackCount = {};
+            console.log('Counting Server Rack Contents...');
+            player.rack.forEach((tileInRack, index) => {
+                // Log each tile being counted
+                console.log(`  Rack[${index}]: { letter: '${tileInRack.letter}', value: ${tileInRack.value} }`);
+                if (tileInRack.letter) { // Ensure letter exists
+                    currentRackCount[tileInRack.letter] = (currentRackCount[tileInRack.letter] || 0) + 1;
+                } else {
+                     console.warn(`  WARNING: Tile at index ${index} in server rack has no letter property!`, tileInRack);
+                }
+            });
+            console.log('Counted Server Rack:', JSON.stringify(currentRackCount));
+    
+            // Compare needed tiles count vs current rack count
+            for (const letter in neededTiles) {
+                const neededCount = neededTiles[letter];
+                const hasCount = currentRackCount[letter] || 0; // Default to 0 if letter not in rack
+                console.log(`Checking Requirement: Need ${neededCount} of '${letter}', Have ${hasCount}`);
+                if (hasCount < neededCount) {
+                    // ---> Log the exact failure point <---
+                    console.warn(`Rack Validation FAIL: Player ${playerId} needs ${neededCount} of '${letter}', but server rack only has ${hasCount}.`);
+                    console.log('--- Rack Validation End ---');
+                    return { success: false, error: `You don't have enough '${letter}' tiles.` }; // Send error back
+                }
+            }
+            // If loop completes, validation passed
+            console.log('Rack validation PASSED.');
+            console.log(`--- Rack Validation End ---`);
+            // --- End Rack Validation ---
+    
+    
+            // --- 2. Validate Placement ---
+            const placementValidation = this._validatePlacement(move);
+            if (!placementValidation.valid) return { success: false, error: placementValidation.error };
+            const { orientation, lineCoords } = placementValidation;
+            console.log(`GameState [${this.gameId}]: Placement validation PASSED. Orientation: ${orientation}`);
+    
+            // --- 3. Validate Words ---
+            const formedWordsResult = this._findFormedWords(move, orientation, lineCoords);
+            if (!formedWordsResult.valid) return { success: false, error: formedWordsResult.error };
+            const { wordsData } = formedWordsResult;
+            if (wordsData.length === 0 && move.length > 0) return { success: false, error: 'Move must form at least one word.' };
+            console.log(`GameState [${this.gameId}]: Word validation PASSED. Words: ${wordsData.map(w=>w.word).join(', ')}`);
+    
+            // --- 4. Calculate Score ---
+            const scoreResult = this._calculateScore(move, wordsData);
+            const totalScore = scoreResult.score;
+            const bingoBonus = scoreResult.bingoBonus;
+            console.log(`GameState [${this.gameId}]: Score calculated: ${totalScore} (Bingo: ${bingoBonus})`);
+    
+            // --- 5. Update State ---
+            const rackTilesToRemove = [];
+            const currentRackCopy = [...player.rack];
+            // a. Update board
+            for (const tile of move) {
+                 const square = this.board[tile.row][tile.col];
+                 const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase();
+                 const rackTileIndex = currentRackCopy.findIndex(t => t.letter === requiredLetter);
+                 if (rackTileIndex === -1) { console.error(`CRITICAL INTERNAL ERROR: Tile ${requiredLetter} not found in rack copy.`); return { success: false, error: `Internal error: Tile ${requiredLetter} not found.` }; }
+                 const [rackTile] = currentRackCopy.splice(rackTileIndex, 1);
+                 rackTilesToRemove.push(rackTile);
+                 square.tile = { letter: tile.letter.toUpperCase(), value: rackTile.value };
+                 if (square.premium && !square.isPremiumUsed) {
+                     // console.log(`   Marking premium ${square.premium} at (${tile.row},${tile.col}) as used.`); // Less verbose
+                     square.isPremiumUsed = true;
+                 }
+            }
+            // b. Update player score
+            player.score += totalScore;
+            // c. Remove used tiles from actual rack
+            player.rack = player.rack.filter(tile => !rackTilesToRemove.includes(tile));
+            // d. Draw new tiles
+            this.drawTiles(player, move.length);
+            // e. Update game state properties
+            this.consecutivePasses = 0; this.isFirstMove = false;
+            this.lastMove = { playerId, move: move.map(m=>({...m})), wordsData, score: totalScore, bingoBonus };
+            this.moveHistory.push(this.lastMove);
+    
+            // --- 6. Advance Turn ---
+            this.advanceTurn();
+    
+            // --- 7. Check Game Over ---
+            const gameOverInfo = this._checkGameOver(player);
+            if (gameOverInfo.isOver) {
+                console.log(`GameState [${this.gameId}]: Game ending after move by ${player.username}. Reason: ${gameOverInfo.reason}`);
+                 return { success: true, score: totalScore, gameOver: true, finalScores: this.finalScores };
+            } else {
+                console.log(`GameState [${this.gameId}]: Player ${playerId} placed move. Score: ${totalScore}. New total: ${player.score}`);
+                 return { success: true, score: totalScore, gameOver: false };
+            }
+        } // End placeValidMove
 
     // --- Complex Logic Helpers ---
 

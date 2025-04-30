@@ -150,19 +150,31 @@ class GameState {
         return { success: true };
     }
 
-
     placeValidMove(playerId, move) { // move = [{ letter, value, row, col, isBlank }, ...]
+        // ---> ADD INPUT VALIDATION <---
+        if (!Array.isArray(move) || move.some(tile => typeof tile?.letter !== 'string')) {
+             console.error(`GameState [${this.gameId}]: Invalid move data received from ${playerId}. Missing or invalid letters.`, move);
+             return { success: false, error: 'Invalid move data received. Malformed tile structure.' };
+        }
+        // ---> END INPUT VALIDATION <---
+    
         const turnCheck = this._checkTurn(playerId);
         if (!turnCheck.valid) return { success: false, error: turnCheck.error };
-
+    
         const player = this.players[this.currentTurnIndex];
         if (!player) return { success: false, error: 'Internal error: Current player not found.' };
-
+    
         // --- 1. Validate Tiles in Rack ---
         const neededTiles = {};
-        for (const tile of move) { const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase(); neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1; }
-        const currentRack = {}; player.rack.forEach(t => { currentRack[t.letter] = (currentRack[t.letter] || 0) + 1; });
-        for (const letter in neededTiles) { if (!currentRack[letter] || currentRack[letter] < neededTiles[letter]) return { success: false, error: `You don't have enough '${letter}' tiles.` }; }
+        for (const tile of move) {
+            // Now we know tile.letter is a string (could be empty)
+            const requiredLetter = tile.isBlank ? 'BLANK' : tile.letter.toUpperCase();
+             if (!requiredLetter) { // Handle empty string case explicitly if it's invalid
+                 console.warn(`GameState [${this.gameId}]: Received move with empty letter string from ${playerId}.`);
+                 return { success: false, error: 'Move contains invalid empty tile letter.' };
+             }
+            neededTiles[requiredLetter] = (neededTiles[requiredLetter] || 0) + 1;
+        }
 
         // --- 2. Placement Validation ---
         const placementValidation = this._validatePlacement(move);

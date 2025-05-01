@@ -85,8 +85,8 @@ useEffect(() => {
     // Also clear if game is over
     if (isGameOver) {
          console.log("App Effect: Game is over. Clearing temporary placements and selection.");
-         setTemporaryPlacements([]);
-         setSelectedTilesForExchange([]);
+         //setTemporaryPlacements([]);
+         //setSelectedTilesForExchange([]);
     }
 // Run this effect whenever gameState (which includes turn status) or isGameOver changes
 }, [gameState, isMyTurn, isGameOver]);

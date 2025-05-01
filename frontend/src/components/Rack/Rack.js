@@ -89,7 +89,6 @@ const Rack = ({
                                 originData={{ type: 'rack', index: tileInfo.originalIndex }}
                                 isSelected={tileInfo.isSelected} // Pass selection state
                             />
-                             console.log(`Tile Rendering: ID=${id}, Letter=${letter}, Value=${value}, isDraggable=${isDraggable}, isSelected=${isSelected}`);
                         ) : (
                             <div className="empty-slot"></div> // Placeholder
                         )}

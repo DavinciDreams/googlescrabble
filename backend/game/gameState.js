@@ -343,16 +343,18 @@ class GameState {
         return { valid: true, wordsData };
     }
 
-    _calculateScore(move, wordsData) {
+    function calculateScore(board, move, wordsData, isFirstMove) {
         let totalScore = 0;
-        console.log(`GameState [${this.gameId}]: Calculating score for ${wordsData.length} word(s).`);
+        console.log(`Calculating score for ${wordsData.length} word(s).`);
         for (const { word, tiles } of wordsData) {
-            let currentWordScore = 0; let wordMultiplier = 1;
+            let currentWordScore = 0;
+            let wordMultiplier = 1;
             console.log(`  Scoring word: ${word}`);
             for (const tile of tiles) {
-                let letterScore = tile.value;
+                let letterScore = tile.value; // Value from _findFormedWords (original value)
+                // Apply premiums only if tile is NEW and premium is unused on board
                 if (tile.isNew) {
-                    const originalSquare = this.board[tile.r][tile.c];
+                    const originalSquare = board[tile.r][tile.c]; // Check original board
                     if (originalSquare.premium && !originalSquare.isPremiumUsed) {
                         console.log(`    Tile ${tile.letter} @(${tile.r},${tile.c}) hit premium: ${originalSquare.premium}`);
                         switch (originalSquare.premium) {
@@ -361,18 +363,22 @@ class GameState {
                             case 'DW': wordMultiplier *= 2; console.log(`      DW -> Word x${wordMultiplier}`); break;
                             case 'TW': wordMultiplier *= 3; console.log(`      TW -> Word x${wordMultiplier}`); break;
                         }
-                        if (originalSquare.isCenter && this.isFirstMove) { wordMultiplier *= 2; console.log(`      Center bonus (DW) -> Word x${wordMultiplier}`); }
+                        // Center square counts as DW on first move only
+                        if (originalSquare.isCenter && isFirstMove && originalSquare.premium !== 'DW' && originalSquare.premium !== 'TW') {
+                            wordMultiplier *= 2; console.log(`      Center bonus (DW) -> Word x${wordMultiplier}`);
+                        }
                     }
                 }
-                 currentWordScore += letterScore;
-             }
-             const finalWordScore = currentWordScore * wordMultiplier;
-             console.log(`  Word: ${word}, Base: ${currentWordScore}, Multiplier: x${wordMultiplier}, Final: ${finalWordScore}`);
-             totalScore += finalWordScore;
+                currentWordScore += letterScore;
+            }
+            const finalWordScore = currentWordScore * wordMultiplier;
+            console.log(`  Word: ${word}, Base: ${currentWordScore}, Multiplier: x${wordMultiplier}, Final: ${finalWordScore}`);
+            totalScore += finalWordScore;
         }
         let bingoBonus = 0;
-        if (move.length === RACK_SIZE) { bingoBonus = 50; totalScore += bingoBonus; console.log(`GameState [${this.gameId}]: Bingo! +50 points.`); }
+        if (move.length === RACK_SIZE) { bingoBonus = 50; totalScore += bingoBonus; console.log(`Bingo! +50 points.`); }
         return { score: totalScore, bingoBonus };
+        
     }
 
     _checkGameOver(lastPlayer) {

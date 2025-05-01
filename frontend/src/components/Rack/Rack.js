@@ -31,6 +31,7 @@ const Rack = ({
     // Create display tiles array, marking placed and selected status based on indices
     const displayTiles = playerTiles.map((tile, index) => ({
         ...tile, // tile object should be { letter: 'A', value: 1 }
+        
         originalIndex: index, // Store the original index before placeholders
         isPlaced: temporarilyPlacedIndices.includes(index), // Is this tile currently on the board temp?
         isSelected: selectedForExchange.includes(index), // Is this tile currently selected for exchange?
@@ -75,8 +76,8 @@ const Rack = ({
             <div className="rack-tiles">
                 {displayTiles.map((tileInfo) => (
                     <div
-                       key={tileInfo.isPlaceholder ? tileInfo.key : `slot-${tileInfo.originalIndex}`}
-                       className={`rack-slot ${tileInfo?.isPlaced ? 'slot-occupied-temp' : ''} ${tileInfo?.isSelected ? 'slot-selected-exchange' : ''} ${canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? 'selectable' : ''}`}
+// Inside Rack.js map
+key={tileInfo.isPlaceholder ? tileInfo.key : `slot-${tileInfo.originalIndex}-${tileInfo.letter}`} // Add letter to key                       className={`rack-slot ${tileInfo?.isPlaced ? 'slot-occupied-temp' : ''} ${tileInfo?.isSelected ? 'slot-selected-exchange' : ''} ${canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? 'selectable' : ''}`}
                        onClick={() => handleTileClick(tileInfo)}
                        title={canInteract && !tileInfo?.isPlaced && !tileInfo?.isPlaceholder ? "Click to select/deselect for exchange" : (tileInfo?.isPlaced ? "Tile on board" : "")}
                     >

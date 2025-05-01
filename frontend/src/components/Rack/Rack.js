@@ -41,6 +41,7 @@ const Rack = ({
     for (let i = 0; i < placeholdersNeeded; i++) {
         displayTiles.push({ isPlaceholder: true, key: `placeholder-${i}` });
     }
+    console.log("Rack Component - displayTiles array before render:", JSON.stringify(displayTiles, null, 2));
 
     // --- Drop Handling ---
     const handleDrop = (e) => {

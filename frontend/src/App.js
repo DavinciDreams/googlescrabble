@@ -73,7 +73,24 @@ function App() {
             }
         };
     }, []); // Run only once on mount to establish connection
-
+// --->>> NEW Effect to Clear Temporary State on Turn Change <<<---
+useEffect(() => {
+    // If gameState exists and it's NOT our turn anymore, clear temporary states
+    // isMyTurn is derived from gameState, so checking gameState first is good practice
+    if (gameState && !isMyTurn) {
+         console.log("App Effect: Turn changed or game state loaded where it's not my turn. Clearing temporary placements and selection.");
+         setTemporaryPlacements([]);
+         setSelectedTilesForExchange([]);
+    }
+    // Also clear if game is over
+    if (isGameOver) {
+         console.log("App Effect: Game is over. Clearing temporary placements and selection.");
+         setTemporaryPlacements([]);
+         setSelectedTilesForExchange([]);
+    }
+// Run this effect whenever gameState (which includes turn status) or isGameOver changes
+}, [gameState, isMyTurn, isGameOver]);
+// --->>> END NEW Effect <<<---
     // --- Action Handlers (Remain in App, use socketService directly) ---
 
     const handleJoinGame = useCallback((e) => {

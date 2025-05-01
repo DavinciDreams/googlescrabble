@@ -21,6 +21,8 @@ const Tile = ({
     originData,
     isSelected = false
 }) => {
+    console.log(`Tile Rendering: ID=${id}, Letter=${letter}, Value=${value}, isDraggable=${isDraggable}, isSelected=${isSelected}`); // <-- ADD THIS LINE
+
     // Determine if it's a blank tile
     const isBlank = letter === 'BLANK' || value === 0;
 

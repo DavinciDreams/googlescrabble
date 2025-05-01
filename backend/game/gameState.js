@@ -219,10 +219,7 @@ class GameState {
                  const [rackTile] = currentRackCopy.splice(rackTileIndex, 1);
                  rackTilesToRemove.push(rackTile);
                  square.tile = { letter: tile.letter.toUpperCase(), value: rackTile.value };
-                 if (square.premium && !square.isPremiumUsed) {
-                     // console.log(`   Marking premium ${square.premium} at (${tile.row},${tile.col}) as used.`); // Less verbose
-                     square.isPremiumUsed = true;
-                 }
+                 // Premium squares are now marked as used during score calculation
             }
             // b. Update player score
             player.score += totalScore;
@@ -373,25 +370,35 @@ class GameState {
                             case 'DL':
                                 letterScore *= 2;
                                 console.log(`      DL applied -> Letter Score: ${letterScore}`);
+                                // Mark premium as used immediately
+                                square.isPremiumUsed = true;
                                 break;
                             case 'TL':
                                 letterScore *= 3;
                                 console.log(`      TL applied -> Letter Score: ${letterScore}`);
+                                // Mark premium as used immediately
+                                square.isPremiumUsed = true;
                                 break;
                             // ---> Store word multipliers temporarily <---
                             case 'DW':
                                 currentWordMultiplier *= 2;
                                 console.log(`      DW applied -> Word Multiplier now: x${currentWordMultiplier}`);
+                                // Mark premium as used immediately
+                                square.isPremiumUsed = true;
                                 break;
                             case 'TW':
                                 currentWordMultiplier *= 3;
                                 console.log(`      TW applied -> Word Multiplier now: x${currentWordMultiplier}`);
+                                // Mark premium as used immediately
+                                square.isPremiumUsed = true;
                                 break;
                         }
                          // Center square counts as DW on first move only
                         if (square.isCenter && this.isFirstMove && square.premium !== 'DW' && square.premium !== 'TW') {
                              currentWordMultiplier *= 2;
                              console.log(`      Center bonus (DW) applied -> Word Multiplier now: x${currentWordMultiplier}`);
+                             // Mark center premium as used immediately
+                             square.isPremiumUsed = true;
                         }
                     }
                 }

@@ -305,8 +305,7 @@ class GameState {
 
     _findFormedWords(move, orientation, lineCoords) {
         // --->>> Keep ONLY the first declaration <<<---
-        const moveCoordsSet = new Set(move.map(t => `${t.r}-${t.c}`));
-        console.log("_findFormedWords - moveCoordsSet:", Array.from(moveCoordsSet)); // Log the set contents
+        const moveCoordsSet = new Set(move.map(t => `${t.row}-${t.col}`)); // Use t.row and t.col        console.log("_findFormedWords - moveCoordsSet:", Array.from(moveCoordsSet)); // Log the set contents
 
         const wordsData = [];
         const tempBoard = _.cloneDeep(this.board);

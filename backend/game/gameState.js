@@ -304,43 +304,76 @@ class GameState {
     }
 
     _findFormedWords(move, orientation, lineCoords) {
-        const wordsData = []; const tempBoard = _.cloneDeep(this.board);
+        // --->>> Keep ONLY the first declaration <<<---
         const moveCoordsSet = new Set(move.map(t => `${t.r}-${t.c}`));
-        for (const tile of move) { tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value }; }
+        console.log("_findFormedWords - moveCoordsSet:", Array.from(moveCoordsSet)); // Log the set contents
+
+        const wordsData = [];
+        const tempBoard = _.cloneDeep(this.board);
+        // --->>> DELETE THIS LINE <<<---
+        // const moveCoordsSet = new Set(move.map(t => `${t.r}-${t.c}`)); // Remove duplicate declaration
+
+        // Place tiles on temp board
+        for (const tile of move) {
+            if(tempBoard[tile.row]?.[tile.col]) {
+                 tempBoard[tile.row][tile.col].tile = { letter: tile.letter.toUpperCase(), value: tile.value };
+            } else { return { valid: false, error: "Internal Error: Invalid coordinate during word find." }; }
+        }
 
         const checkWord = (startTileCoord, axis) => {
             if (!startTileCoord) return; let r = startTileCoord.r; let c = startTileCoord.c;
             if (axis === 'H') { while (c > 0 && tempBoard[r]?.[c - 1]?.tile) c--; } else { while (r > 0 && tempBoard[r - 1]?.[c]?.tile) r--; }
             let currentWord = ''; const currentWordTiles = []; let currentPosR = r; let currentPosC = c;
+            let containsNewTile = false; // Reset for each word check
+
             while (currentPosR < BOARD_SIZE && currentPosC < BOARD_SIZE && tempBoard[currentPosR]?.[currentPosC]?.tile) {
                 const currentSquare = tempBoard[currentPosR][currentPosC];
                 const originalSquare = this.board[currentPosR][currentPosC];
                 const originalTileValue = originalSquare.tile ? originalSquare.tile.value : TILE_DISTRIBUTION[currentSquare.tile.letter]?.value ?? 0;
+
+                const coordStr = `${currentPosR}-${currentPosC}`;
+                const isNew = moveCoordsSet.has(coordStr); // Use the single moveCoordsSet defined above
+                if (isNew) containsNewTile = true;
+
+                // ---> ADDED LOG INSIDE LOOP (as requested before) <---
+                console.log(`  _findFormedWords: Checking tile ${currentSquare.tile.letter} @(${currentPosR},${currentPosC}). CoordStr: ${coordStr}. Is in moveCoordsSet? ${isNew}`);
+
                 currentWord += currentSquare.tile.letter;
-                currentWordTiles.push({ letter: currentSquare.tile.letter, value: originalTileValue, r: currentPosR, c: currentPosC, premium: originalSquare.premium, isPremiumUsed: originalSquare.isPremiumUsed, isNew: moveCoordsSet.has(`${currentPosR}-${currentPosC}`) });
+                currentWordTiles.push({
+                    letter: currentSquare.tile.letter,
+                    value: originalTileValue,
+                    r: currentPosR, c: currentPosC,
+                    premium: originalSquare.premium,
+                    isPremiumUsed: originalSquare.isPremiumUsed,
+                    isNew: isNew // Assign calculated flag
+                });
                 if (axis === 'H') currentPosC++; else currentPosR++;
             }
-            if (currentWord.length > 1) {
+
+            // Only add word if > 1 letter AND contains a new tile
+            if (currentWord.length > 1 && containsNewTile) {
                  if (!dictionary.isValidWord(currentWord)) throw new Error(`Invalid word: ${currentWord}`);
                  const wordKey = `${currentWord}-${axis}-${r},${c}`;
-                 if (!wordsData.some(wd => wd.key === wordKey)) wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
+                 if (!wordsData.some(wd => wd.key === wordKey)) {
+                      console.log(`   Found valid word: ${currentWord} (Key: ${wordKey})`);
+                      wordsData.push({ key: wordKey, word: currentWord, tiles: currentWordTiles });
+                 }
             }
-        };
+        }; // End checkWord
 
         try {
              if (!lineCoords || lineCoords.length === 0) throw new Error("Internal: lineCoords missing.");
-             checkWord(lineCoords[0], orientation);
+             checkWord(lineCoords[0], orientation); // Check main word
              const crossAxis = (orientation === 'H') ? 'V' : 'H';
+             // Check cross words if needed
              if (orientation === 'single' || lineCoords.length >= 1) {
                  for (const tile of move) { checkWord({ r: tile.row, c: tile.col }, crossAxis); }
              }
         } catch (error) { console.error(`Word validation error: ${error.message}`); return { valid: false, error: error.message }; }
 
-        if (wordsData.length === 0 && move.length > 0) return { valid: false, error: 'Move must form word >= 2 letters.' };
+        if (wordsData.length === 0 && move.length > 0) { return { valid: false, error: 'Move must form word >= 2 letters.' }; }
         return { valid: true, wordsData };
-    }
-
-    // --- Score Calculation Helper ---
+    } // End _findFormedWords
     _calculateScore(move, wordsData) {
         let totalScore = 0;
         console.log(`GameState [${this.gameId}]: === Score Calculation Start ===`);

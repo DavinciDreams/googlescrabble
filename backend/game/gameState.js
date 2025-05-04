@@ -359,6 +359,26 @@ class GameState {
                     const square = this.board[tile.r][tile.c]; // Get board square state
 // Inside _calculateScore -> inner loop
 if (tile.isNew) {
+        // Inside _calculateScore -> inner loop for tile in tiles
+        if (tile.isNew) {
+            const square = this.board[tile.r][tile.c];
+            // --->>> ADD THESE LOGS <<<---
+            console.log(`    Checking premiums for NEW tile ${tile.letter} @(${tile.r},${tile.c}): Premium=${square?.premium}, Used=${square?.isPremiumUsed}, isFirstMove=${this.isFirstMove}`);
+            // --->>> END LOGS <<<---
+            if (square.premium && !square.isPremiumUsed) {
+                console.log(`        Premium detected and unused! Applying...`); // Log if condition passes
+                switch (square.premium) {
+                    // ... cases ...
+                }
+                // ... center check ...
+            } else if (square.premium) {
+                 console.log(`        Premium ${square.premium} was already used.`); // Log if premium USED
+            } else {
+                 console.log(`        No premium on this square.`); // Log if no premium
+            }
+        } else {
+             console.log(`    Skipping premiums for OLD tile ${tile.letter} @(${tile.r},${tile.c})`); // Log if tile.isNew is false
+        }
     const square = this.board[tile.r][tile.c];
     // ---> ADD LOGS HERE <---
     console.log(`    Checking premiums for NEW tile ${tile.letter} @(${tile.r},${tile.c}): Premium=${square.premium}, Used=${square.isPremiumUsed}, isFirstMove=${this.isFirstMove}`);

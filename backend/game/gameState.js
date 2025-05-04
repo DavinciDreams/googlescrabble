@@ -340,114 +340,88 @@ class GameState {
         return { valid: true, wordsData };
     }
 
+    // --- Score Calculation Helper ---
     _calculateScore(move, wordsData) {
         let totalScore = 0;
         console.log(`GameState [${this.gameId}]: === Score Calculation Start ===`);
         console.log(`Calculating score for ${wordsData.length} word(s). Move Length: ${move.length}`);
 
-        for (const { word, tiles } of wordsData) {
+        for (const { word, tiles } of wordsData) { // Iterate each word formed
             let currentWordScore = 0;
-            // --->>> Initialize wordMultiplier to 1 for EACH word <<<---
-            let wordMultiplier = 1;
+            let wordMultiplier = 1; // Multiplier specific to this word
             console.log(`  Scoring word: ${word}`);
 
-            for (const tile of tiles) { // Iterate each tile in the formed word
+            for (const tile of tiles) { // Iterate each tile within that word
                 let letterScore = tile.value; // Base value (0 for blank)
 
-                // Apply premiums only if tile is NEW and premium is UNUSED
-                if (tile.isNew) { // Check if this tile was just placed
+                // --->>> Check if tile is new and apply premiums <<<---
+                if (tile.isNew) {
                     const square = this.board[tile.r][tile.c]; // Get board square state
-// Inside _calculateScore -> inner loop
-if (tile.isNew) {
-        // Inside _calculateScore -> inner loop for tile in tiles
-        if (tile.isNew) {
-            const square = this.board[tile.r][tile.c];
-            // --->>> ADD THESE LOGS <<<---
-            console.log(`    Checking premiums for NEW tile ${tile.letter} @(${tile.r},${tile.c}): Premium=${square?.premium}, Used=${square?.isPremiumUsed}, isFirstMove=${this.isFirstMove}`);
-            // --->>> END LOGS <<<---
-            if (square.premium && !square.isPremiumUsed) {
-                console.log(`        Premium detected and unused! Applying...`); // Log if condition passes
-                switch (square.premium) {
-                    // ... cases ...
-                }
-                // ... center check ...
-            } else if (square.premium) {
-                 console.log(`        Premium ${square.premium} was already used.`); // Log if premium USED
-            } else {
-                 console.log(`        No premium on this square.`); // Log if no premium
-            }
-        } else {
-             console.log(`    Skipping premiums for OLD tile ${tile.letter} @(${tile.r},${tile.c})`); // Log if tile.isNew is false
-        }
-    const square = this.board[tile.r][tile.c];
-    // ---> ADD LOGS HERE <---
-    console.log(`    Checking premiums for NEW tile ${tile.letter} @(${tile.r},${tile.c}): Premium=${square.premium}, Used=${square.isPremiumUsed}, isFirstMove=${this.isFirstMove}`);
-    // ---> END LOGS <---
-    if (square.premium && !square.isPremiumUsed) {
-        // ... switch statement ...
-    }
-}
-                    // --->>> Check Premium Square Logic <<<---
+
+                    // ---> Log the state BEFORE checking premium application <---
+                    console.log(`    Checking premiums for NEW tile ${tile.letter} @(${tile.r},${tile.c}): Premium=${square?.premium}, Used=${square?.isPremiumUsed}, isFirstMove=${this.isFirstMove}`);
+
+                    // Check if premium exists and is unused
                     if (square.premium && !square.isPremiumUsed) {
-                        console.log(`    Tile ${tile.letter} @(${tile.r},${tile.c}) hit unused premium: ${square.premium}`);
+                        console.log(`        Premium detected and unused! Applying: ${square.premium}`);
                         switch (square.premium) {
                             case 'DL':
                                 letterScore *= 2;
-                                console.log(`      DL applied -> Letter Score: ${letterScore}`);
+                                console.log(`          DL applied -> Letter Score now: ${letterScore}`);
                                 break;
                             case 'TL':
                                 letterScore *= 3;
-                                console.log(`      TL applied -> Letter Score: ${letterScore}`);
+                                console.log(`          TL applied -> Letter Score now: ${letterScore}`);
                                 break;
-                            // ---> Check Word Multiplier Cases <---
                             case 'DW':
                                 wordMultiplier *= 2;
-                                console.log(`      DW applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
+                                console.log(`          DW applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
                                 break;
                             case 'TW':
                                 wordMultiplier *= 3;
-                                console.log(`      TW applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
+                                console.log(`          TW applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
                                 break;
-                            // ---> End Word Multiplier Cases <---
                         }
-                        // ---> Check Center Square Bonus (only if first move) <---
-                        if (square.isCenter && this.isFirstMove) {
-                            // Check if it didn't *already* apply DW/TW from layout
-                            if (square.premium !== 'DW' && square.premium !== 'TW') {
-                                 wordMultiplier *= 2; // Center acts like DW
-                                 console.log(`      Center bonus (DW) applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
-                            } else {
-                                // Log if center bonus isn't applied because square is already DW/TW
-                                console.log(`      Center bonus skipped (Square is already ${square.premium})`);
-                            }
+                        // Center square bonus (counts as DW on first move), only if not already DW/TW
+                        if (square.isCenter && this.isFirstMove && square.premium !== 'DW' && square.premium !== 'TW') {
+                            wordMultiplier *= 2;
+                            console.log(`          Center bonus (DW) applied -> Word Multiplier for '${word}' now: x${wordMultiplier}`);
                         }
-                        // ---> End Center Square Check <---
                     } else if (square.premium && square.isPremiumUsed) {
-                         console.log(`    Tile ${tile.letter} @(${tile.r},${tile.c}) on USED premium: ${square.premium} (No bonus applied)`);
+                        // Log if premium exists but was already used
+                        console.log(`        Premium ${square.premium} at (${tile.r},${tile.c}) was already used.`);
+                    } else {
+                        // Log if no premium on the square
+                        // console.log(`        No premium on square (${tile.r},${tile.c}).`); // Can make logs verbose
                     }
-                    // --->>> End Premium Square Logic <<<---
-                } // End if(tile.isNew)
+                } else {
+                    // Log tiles that are part of the word but not newly placed
+                    console.log(`    Skipping premiums for OLD tile ${tile.letter} @(${tile.r},${tile.c})`);
+                }
+                // --->>> End Premium Check Logic <<<---
 
-                currentWordScore += letterScore; // Add letter score (possibly multiplied)
+                currentWordScore += letterScore; // Add letter's score to word total
+
             } // End loop through tiles in the word
 
-            // Apply the accumulated word multiplier to the word's base score
+            // Apply the total word multiplier for this word
             const finalWordScore = currentWordScore * wordMultiplier;
             console.log(`  Word: ${word}, Base: ${currentWordScore}, Multiplier: x${wordMultiplier}, Final Word Score: ${finalWordScore}`);
             totalScore += finalWordScore;
 
         } // End loop through wordsData
 
-        // Add Bingo bonus
+        // Add Bingo bonus if applicable
         let bingoBonus = 0;
         if (move.length === RACK_SIZE) {
-            bingoBonus = 50; totalScore += bingoBonus;
+            bingoBonus = 50;
+            totalScore += bingoBonus;
             console.log(`Bingo bonus applied! +50 points.`);
         }
+
         console.log(`=== Score Calculation End === Total Score: ${totalScore}`);
         return { score: totalScore, bingoBonus };
-    }
-     
+    } // ---> End of _calculateScore method
    // --->>> End Score Calculation Helper <<<---
     _checkGameOver(lastPlayer) {
         if (this.tileBag.length === 0 && lastPlayer?.rack.length === 0) {

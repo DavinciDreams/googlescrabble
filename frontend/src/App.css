@@ -162,3 +162,55 @@
     margin: 10px 0;
     text-align: center;
 }
+
+**B. Add CSS for Blank Assignment UI**
+
+```css
+/* In App.css or a new CSS file */
+.blank-assign-overlay {
+  position: fixed; /* Or absolute relative to game area */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050; /* Ensure it's above other elements */
+}
+
+.blank-assign-box {
+  background-color: var(--bg-color, #fdfcf6);
+  padding: 25px 30px;
+  border: var(--border-thickness, 3px) solid var(--border-color, #000);
+  box-shadow: 5px 5px 0px var(--border-color);
+  text-align: center;
+}
+
+.blank-assign-box h4 {
+  margin-top: 0;
+  font-family: var(--headline-font);
+  font-size: 1.5em;
+  margin-bottom: 15px;
+}
+.blank-assign-box p {
+  margin-bottom: 15px;
+  font-family: var(--body-font);
+}
+
+.blank-assign-input {
+  display: block;
+  width: 100px;
+  margin: 0 auto 15px auto;
+  padding: 10px;
+  font-size: 1.8em;
+  text-align: center;
+  border: 2px solid var(--border-color);
+  font-family: var(--tile-letter-font);
+  text-transform: uppercase;
+}
+
+.blank-assign-button {
+   /* Use general button styles or customize */
+}
